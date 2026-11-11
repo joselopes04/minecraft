@@ -1,0 +1,246 @@
+plugins {
+    id 'application'
+    id 'java'
+    id "de.undercouch.download" version "5.7.0"
+    id 'idea'
+    id "io.github.0ffz.github-packages" version "1.2.1" // Plugin for anonymous inclusion of artifacts hosted in github package registry
+}
+
+description = 'Test application'
+
+java {
+    sourceCompatibility = JavaVersion.VERSION_17
+    targetCompatibility = JavaVersion.VERSION_17
+}
+
+ext.jmonkeyengineVersion = '3.9.0-stable'
+ext.lwjglVersion = '3.4.3'
+
+repositories {
+    mavenCentral()
+    mavenLocal()
+}
+
+application {
+    mainClass = 'jogo.Jogo'
+    // jMonkeyEngine, LWJGL and Minie load native libraries.
+    applicationDefaultJvmArgs = ['--enable-native-access=ALL-UNNAMED']
+    if (System.getProperty("os.name").toLowerCase().contains("mac")) {
+        applicationDefaultJvmArgs += ['-XstartOnFirstThread'] // this is when using a Mac as a development machine which requires the AppKit main UI thread to be used for GUI applications
+    }
+}
+
+// Compile against the Java 17 API even when Gradle runs on a newer JDK.
+tasks.withType(JavaCompile).configureEach {
+    options.release = 17
+    options.compilerArgs.add('-Xlint:deprecation')
+}
+
+dependencies {
+    // Override jME's LWJGL version consistently for Java modules and native artifacts.
+    implementation enforcedPlatform("org.lwjgl:lwjgl-bom:${lwjglVersion}")
+
+    // You can read more about how to add dependencies here:
+    //   https://docs.gradle.org/current/userguide/dependency_management.html#sec:how_to_declare_your_dependencies
+
+    implementation 'org.jmonkeyengine:jme3-core:' + jmonkeyengineVersion
+    implementation 'org.jmonkeyengine:jme3-desktop:' + jmonkeyengineVersion
+    runtimeOnly 'org.jmonkeyengine:jme3-awt-dialogs:' + jmonkeyengineVersion
+    runtimeOnly 'org.jmonkeyengine:jme3-jogg:' + jmonkeyengineVersion
+    runtimeOnly 'org.jmonkeyengine:jme3-plugins:' + jmonkeyengineVersion
+    runtimeOnly 'org.jmonkeyengine:jme3-lwjgl3:' + jmonkeyengineVersion
+
+    // Post-processing effects (SSAO, etc.)
+    implementation 'org.jmonkeyengine:jme3-effects:' + jmonkeyengineVersion
+
+    implementation 'com.simsilica:lemur:1.16.0'
+    implementation 'com.simsilica:lemur-proto:1.13.0'
+    implementation 'com.github.stephengold:Minie:9.0.3'
+}
+
+tasks.named('distZip', Zip) {
+    //having a degenerate folder within the dist zip complicates generating the other zips
+    eachFile { file ->
+        String path = file.relativePath
+        file.setPath(path.substring(path.indexOf("/") + 1, path.length()))
+    }
+    includeEmptyDirs = false
+}
+
+def buildDirectory = layout.buildDirectory
+def distZipTask = tasks.named('distZip', Zip)
+
+// Bundled Java 17 runtimes used by the custom distribution tasks.
+def windowsJreUrl = "https://github.com/adoptium/temurin17-binaries/releases/download/jdk-17.0.6%2B10/OpenJDK17U-jre_x64_windows_hotspot_17.0.6_10.zip"
+def linuxJreUrl = "https://github.com/adoptium/temurin17-binaries/releases/download/jdk-17.0.6%2B10/OpenJDK17U-jre_x64_linux_hotspot_17.0.6_10.tar.gz"
+def macJreUrl = "https://github.com/adoptium/temurin17-binaries/releases/download/jdk-17.0.6%2B10/OpenJDK17U-jre_x64_mac_hotspot_17.0.6_10.tar.gz"
+
+
+tasks.register('downloadWindowsJre', Download) {
+    src windowsJreUrl
+    dest buildDirectory.file('jres/windowsJre.zip').get().asFile
+    overwrite false
+}
+
+tasks.register('downloadAndUnzipWindowsJre', Copy) {
+    dependsOn('downloadWindowsJre')
+    from zipTree(tasks.named('downloadWindowsJre', Download).map { it.dest })
+    into buildDirectory.dir('jres/windowsJre/')
+    includeEmptyDirs = false
+    filesMatching("**") {
+        it.path = it.path.replaceAll("^[a-zA-Z0-9.+-]*[/\\\\]", "jre/") //rename the top level to something standard so the rest of the script will be easier
+    }
+}
+
+tasks.register('buildWindowsDistribution', Copy) {
+    dependsOn(distZipTask, 'downloadAndUnzipWindowsJre')
+    group = 'distribution'
+    from files("${projectDir}/scripts/desktopDeployment/Test.bat"), zipTree(distZipTask.flatMap { it.archiveFile }), buildDirectory.dir('jres/windowsJre')
+    into buildDirectory.dir('distributions/Test-windows')
+    includeEmptyDirs = false
+    exclude 'bin/**' //we are adding our own run scripts, exclude the ones coming from distZip
+}
+
+tasks.register('zipWindowsDistribution', Zip) {
+    dependsOn('buildWindowsDistribution')
+    group = 'distribution'
+    archiveFileName = "Test-windows.zip"
+    destinationDirectory = buildDirectory.dir('distributions')
+    from buildDirectory.dir('distributions/Test-windows')
+}
+
+
+tasks.register('downloadLinuxJre', Download) {
+    src linuxJreUrl
+    dest buildDirectory.file('jres/linuxJre.tar.gz').get().asFile
+    overwrite false
+}
+
+tasks.register('downloadAndUnzipLinuxJre', Copy) {
+    dependsOn('downloadLinuxJre')
+    from tarTree(resources.gzip(tasks.named('downloadLinuxJre', Download).map { it.dest }))
+    into buildDirectory.dir('jres/linuxJre/')
+    includeEmptyDirs = false
+    filesMatching("**") {
+        it.path = it.path.replaceAll("^[a-zA-Z0-9.+-]*[/\\\\]", "jre/") //rename the top level to something standard so the rest of the script will be easier
+    }
+}
+
+tasks.register('buildLinuxDistribution', Copy) {
+    dependsOn(distZipTask, 'downloadAndUnzipLinuxJre')
+    group = 'distribution'
+    from("${projectDir}/scripts/desktopDeployment/Test.sh"){
+        filePermissions {
+            unix("755")
+        }
+    }
+    from zipTree(distZipTask.flatMap { it.archiveFile })
+    from buildDirectory.dir('jres/linuxJre')
+    into buildDirectory.dir('distributions/Test-linux')
+    includeEmptyDirs = false
+    exclude 'bin/**' //we are adding our own run scripts, exclude the ones coming from distZip
+}
+
+tasks.register('zipLinuxDistribution', Tar) {
+    compression = Compression.GZIP
+    dependsOn('buildLinuxDistribution')
+    group = 'distribution'
+    archiveFileName = "Test-linux.tar.gz"
+    destinationDirectory = buildDirectory.dir('distributions')
+    from (buildDirectory.dir('distributions/Test-linux')){
+      include('**.sh')
+      include('**/java')
+      filePermissions {
+        unix("755")
+      }
+    }
+    from (buildDirectory.dir('distributions/Test-linux')){
+        exclude('**.sh')
+        exclude('**/java')
+    }
+}
+
+
+tasks.register('downloadMacJre', Download) {
+    src macJreUrl
+    dest buildDirectory.file('jres/macJre.tar.gz').get().asFile
+    overwrite false
+}
+
+tasks.register('downloadAndUnzipMacJre', Copy) {
+    dependsOn('downloadMacJre')
+    from tarTree(resources.gzip(tasks.named('downloadMacJre', Download).map { it.dest }))
+    into buildDirectory.dir('jres/macJre/')
+    includeEmptyDirs = false
+    filesMatching("**") {
+        it.path = it.path.replaceAll("^[a-zA-Z0-9.+-]*[/\\\\]", "jre/") //rename the top level to something standard so the rest of the script will be easier
+    }
+}
+
+tasks.register('buildMacDistribution', Copy) {
+    dependsOn(distZipTask, 'downloadAndUnzipMacJre')
+    group = 'distribution'
+    from("${projectDir}/scripts/desktopDeployment/Test.command"){
+        filePermissions {
+            unix("755")
+        }
+    }
+    from zipTree(distZipTask.flatMap { it.archiveFile }) 
+    from buildDirectory.dir('jres/macJre')
+    into buildDirectory.dir('distributions/Test-mac')
+    includeEmptyDirs = false
+    exclude 'bin/**' //we are adding our own run scripts, exclude the ones coming from distZip
+}
+
+tasks.register('zipMacDistribution', Tar) {
+    compression = Compression.GZIP
+    dependsOn('buildMacDistribution')
+    group = 'distribution'
+    archiveFileName = "Test-mac.tar.gz"
+    destinationDirectory = buildDirectory.dir('distributions')
+    from (buildDirectory.dir('distributions/Test-mac')){
+      include('**.command')
+      include('**/java')
+      filePermissions {
+        unix("755")
+      }
+    }
+    from (buildDirectory.dir('distributions/Test-mac')){
+        exclude('**.command')
+        exclude('**/java')
+    }
+}
+
+tasks.register('buildAllDistributions') {
+    group = 'distribution'
+    dependsOn 'zipWindowsDistribution'
+    dependsOn 'zipLinuxDistribution'
+    dependsOn 'zipMacDistribution'
+
+    doLast {
+        println("Distributions created in build/distributions folder")
+    }
+}
+
+// cleanup tasks
+tasks.named('clean', Delete) {
+    dependsOn('cleanDLLs', 'cleanDyLibs', 'cleanLogs', 'cleanSOs')
+}
+tasks.register('cleanDLLs', Delete) {
+    delete fileTree(dir: '.', include: '*.dll')
+}
+tasks.register('cleanDyLibs', Delete) {
+    delete fileTree(dir: '.', include: '*.dylib')
+}
+tasks.register('cleanLogs', Delete) {
+    delete fileTree(dir: '.', include: 'hs_err_pid*.log')
+}
+tasks.register('cleanSOs', Delete) {
+    delete fileTree(dir: '.', include: '*.so')
+}
+
+tasks.register('fund') {
+    doLast {
+       java.awt.Desktop.desktop.browse "https://start.jmonkeyengine.org/#!funding=JME_DESKTOP,LEMUR,MINIE".toURI()
+    }
+}
