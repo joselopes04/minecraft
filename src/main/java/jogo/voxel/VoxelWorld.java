@@ -30,6 +30,9 @@ public class VoxelWorld {
     private boolean culling = true;   // Culling: On by default
     private int groundHeight = 8; // baseline Y level
 
+    //Criar o objeto TerrainGenerator com uma seed fixa para gerar o terreno
+    private final TerrainGenerator terrainGenerator = new TerrainGenerator("IscteCraft2026");
+
     // Chunked world data
     private final int chunkSize = Chunk.SIZE;
     private final int chunkCountX, chunkCountY, chunkCountZ;
@@ -100,11 +103,19 @@ public class VoxelWorld {
 
     public Node getNode() { return node; }
 
-    //TODO this is where you'll generate your world
+   //Gera as camadas do terreno com base na altura da superfície e na posição (x, y, z)
     public void generateLayers() {
-        //generate a SINGLE block under the player:
-        Vector3i pos = new Vector3i(getRecommendedSpawn());
-        setBlock(pos.x, pos.y, pos.z, VoxelPalette.STONE_ID);
+        // Percorre todas as posições do mundo (x,y,z)
+        for (int x = 0; x < sizeX; x++) {
+            for (int z = 0; z < sizeZ; z++) {
+                for (int y = 0; y < sizeY; y++) {
+                    byte blockId = terrainGenerator.getBlockIdAt(x, y, z); 
+                    if (blockId != VoxelPalette.AIR_ID) { //Verificar se o bloco não é ar, pois o ar é colocado na geração dos chunks.
+                        setBlock(x, y, z, blockId);
+                    }
+                }
+            }
+        }
     }
 
     public int getTopSolidY(int x, int z) {
