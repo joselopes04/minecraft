@@ -5,7 +5,7 @@
 /*.dll
 /*.dylib
 /*.so
-
+/bin
 /.idea/
 
 local.properties
