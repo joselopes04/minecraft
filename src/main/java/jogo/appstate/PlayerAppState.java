@@ -36,6 +36,11 @@ public class PlayerAppState extends BaseAppState {
     private float mouseSensitivity = 30f; // degrees per mouse analog unit
     private float eyeHeight = 1.7f;
 
+    private static final float JUMP_COOLDOWN_TIME = 0.20f;//Evitar o dooble jump.
+    private float jumpCooldownTimer = 0f; //Temporizador para o cooldown do salto
+    private static final float MAX_VERTICAL_SPEED_TO_JUMP = 1.0f; //Velocidade vertical para o jogador poder saltar
+    private final Vector3f velocidadeTmp = new Vector3f(); //Vetor para ler a velocidade do jogador
+
     private Vector3f spawnPosition = new Vector3f(25.5f, 12f, 25.5f);
     private PointLight playerLight;
 
@@ -64,7 +69,7 @@ public class PlayerAppState extends BaseAppState {
 
         // BetterCharacterControl(radius, height, mass)
         characterControl = new BetterCharacterControl(0.42f, 1.8f, 80f);
-        characterControl.setJumpForce(new Vector3f(0, 400f, 0));
+        characterControl.setJumpForce(new Vector3f(0, 540f, 0));
         playerNode.addControl(characterControl);
         physicsSpace.add(characterControl);
         characterControl.setGravity(new Vector3f(0, -24f, 0));
@@ -121,15 +126,30 @@ public class PlayerAppState extends BaseAppState {
         characterControl.setWalkDirection(dir.mult(speed));
 
         // jump
-        if (input.consumeJumpRequested() && characterControl.isOnGround()) {
-            characterControl.jump();
-        }
+        updateJump(tpf);
 
         // place camera at eye height above physics location
         applyViewToCamera();
 
         // update light to follow head
         if (playerLight != null) playerLight.setPosition(playerNode.getWorldTranslation().add(0, eyeHeight, 0));
+    }
+
+    //Método para gerir a lógica do salto
+    private void updateJump(float tpf) {
+
+        jumpCooldownTimer = Math.max(0f, jumpCooldownTimer - tpf);//Atualiza o temporizador do cooldown do salto
+
+        boolean jumpRequested = input.consumeJumpRequested() || input.isJumpHeld(); // Confirma se o jogador está a tentar saltar
+
+        characterControl.getVelocity(velocidadeTmp); //Obter a velocidade do jogador
+        boolean paradoVerticalmente = Math.abs(velocidadeTmp.y) < MAX_VERTICAL_SPEED_TO_JUMP; //Verifica se o jogador está parado verticalmente
+
+        //Verificar se o jopgador está a tentar saltar, se o cooldown do salto terminou, se o jogador está parado verticalmente e se o jogador está no chão
+        if (jumpRequested && jumpCooldownTimer <= 0f && paradoVerticalmente && characterControl.isOnGround()) {
+            characterControl.jump();
+            jumpCooldownTimer = JUMP_COOLDOWN_TIME; //Inicia o cooldown do salto
+        }
     }
 
     private void respawn() {
