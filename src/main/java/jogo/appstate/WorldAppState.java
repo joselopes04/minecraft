@@ -11,6 +11,8 @@ import com.jme3.math.ColorRGBA;
 import com.jme3.math.Vector3f;
 import com.jme3.renderer.Camera;
 import com.jme3.scene.Node;
+
+import jogo.voxel.TerrainGenerator;
 import jogo.voxel.VoxelWorld;
 
 public class WorldAppState extends BaseAppState {
@@ -54,8 +56,9 @@ public class WorldAppState extends BaseAppState {
         sun.setColor(ColorRGBA.White.mult(0.85f)); // slightly dimmer sun
         worldNode.addLight(sun);
 
-        // Voxel world 16x16x16 (reduced size for simplicity)
-        voxelWorld = new VoxelWorld(assetManager, 320, 32, 320);
+        // Voxel world criado com base no terrain generator
+        TerrainGenerator generator = new TerrainGenerator("IscteCraft2026");
+        voxelWorld = new VoxelWorld(assetManager, 320, 32, 320, generator);
         voxelWorld.generateLayers();
         voxelWorld.buildMeshes();
         voxelWorld.clearAllDirtyFlags();

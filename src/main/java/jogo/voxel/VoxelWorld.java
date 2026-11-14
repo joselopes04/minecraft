@@ -31,19 +31,20 @@ public class VoxelWorld {
     private int groundHeight = 8; // baseline Y level
 
     //Criar o objeto TerrainGenerator com uma seed fixa para gerar o terreno
-    private final TerrainGenerator terrainGenerator = new TerrainGenerator("IscteCraft2026");
+    private final TerrainGenerator terrainGenerator;
 
     // Chunked world data
     private final int chunkSize = Chunk.SIZE;
     private final int chunkCountX, chunkCountY, chunkCountZ;
     private final Chunk[][][] chunks;
 
-    public VoxelWorld(AssetManager assetManager, int sizeX, int sizeY, int sizeZ) {
+    public VoxelWorld(AssetManager assetManager, int sizeX, int sizeY, int sizeZ,  TerrainGenerator terrainGenerator) {
         this.assetManager = assetManager;
         this.sizeX = sizeX;
         this.sizeY = sizeY;
         this.sizeZ = sizeZ;
         this.palette = VoxelPalette.defaultPalette();
+        this.terrainGenerator = terrainGenerator;
         // Remove old vox array
         // this.vox = new byte[sizeX][sizeY][sizeZ];
         this.chunkCountX = (int)Math.ceil(sizeX / (float)chunkSize);

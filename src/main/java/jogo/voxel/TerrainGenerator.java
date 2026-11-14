@@ -17,7 +17,7 @@ public class TerrainGenerator {
     //Gera um deslocamento aletório ao terreno com base na seed
     public TerrainGenerator(long seed) {
         Random seedRandom = new Random(seed);
-        this.offsetX = seedRandom.nextDouble() * 10000.0;  //
+        this.offsetX = seedRandom.nextDouble() * 10000.0;  
         this.offsetZ = seedRandom.nextDouble() * 10000.0;
         this.seed = seed;
     }
@@ -50,20 +50,20 @@ public class TerrainGenerator {
 
         //Bedrock layer
         if (y == 0) {
-            return 1; 
+            return VoxelPalette.STONE_ID; 
         }
 
        //Grass layer
         if (y == alturaSuperficie ) {
-            return 1; 
+            return VoxelPalette.STONE_ID; 
         }
 
         // Terra Layer
         if (y >= alturaSuperficie - 2) {
-            return 1;
+            return VoxelPalette.STONE_ID; 
         }
 
-        return 1;
+        return VoxelPalette.STONE_ID;
     }
 
     //Função que retorna a seed usada para gerar o terreno (Não está a ser usada para nada)
