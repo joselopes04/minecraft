@@ -17,6 +17,7 @@ public class InputAppState extends BaseAppState implements ActionListener, Analo
     private boolean forward, backward, left, right;
     private boolean sprint;
     private volatile boolean jumpRequested;
+    private volatile boolean jumpHeld; //Guarda se a tecla de salto está a ser carregada, para permitir o buffer do salto
     private volatile boolean breakRequested;
     private volatile boolean toggleShadingRequested;
     private volatile boolean respawnRequested;
@@ -85,9 +86,6 @@ public class InputAppState extends BaseAppState implements ActionListener, Analo
 
     @Override
     public void onAction(String name, boolean isPressed, float tpf) {
-        if (isPressed) {
-            System.out.println("Input received: " + name + " (mouse captured: " + mouseCaptured + ")");
-        }
         switch (name) {
             case "MoveForward" -> forward = isPressed;
             case "MoveBackward" -> backward = isPressed;
@@ -95,7 +93,8 @@ public class InputAppState extends BaseAppState implements ActionListener, Analo
             case "MoveRight" -> right = isPressed;
             case "Sprint" -> sprint = isPressed;
             case "Jump" -> {
-                if (isPressed) jumpRequested = true;
+                jumpHeld = isPressed; //Ativa salto se a tecla está a ser carregada
+                if (isPressed) jumpRequested = true; //Ativa salto se a tecla é pressionada
             }
             case "ToggleMouse" -> {
                 if (isPressed) setMouseCaptured(!mouseCaptured);
@@ -134,6 +133,10 @@ public class InputAppState extends BaseAppState implements ActionListener, Analo
 
     public boolean isSprinting() {
         return sprint;
+    }
+
+    public boolean isJumpHeld() {
+        return jumpHeld;
     }
 
     public boolean consumeJumpRequested() {
