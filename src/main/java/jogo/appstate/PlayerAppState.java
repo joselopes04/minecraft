@@ -36,9 +36,9 @@ public class PlayerAppState extends BaseAppState {
     private float mouseSensitivity = 30f; // degrees per mouse analog unit
     private float eyeHeight = 1.7f;
 
-    private static final float JUMP_COOLDOWN_TIME = 0.20f;//Evitar o dooble jump.
+    private static final float JUMP_COOLDOWN_TIME = 0.20f;//Evitar o double jump.
     private float jumpCooldownTimer = 0f; //Temporizador para o cooldown do salto
-    private static final float MAX_VERTICAL_SPEED_TO_JUMP = 1.0f; //Velocidade vertical para o jogador poder saltar
+    private static final float MAX_VERTICAL_SPEED_TO_JUMP = 2.0f; //Velocidade vertical para o jogador poder saltar
     private final Vector3f velocidadeTmp = new Vector3f(); //Vetor para ler a velocidade do jogador
 
     private Vector3f spawnPosition = new Vector3f(25.5f, 12f, 25.5f);
@@ -137,16 +137,13 @@ public class PlayerAppState extends BaseAppState {
 
     //Método para gerir a lógica do salto
     private void updateJump(float tpf) {
-
         jumpCooldownTimer = Math.max(0f, jumpCooldownTimer - tpf);//Atualiza o temporizador do cooldown do salto
 
-        boolean jumpRequested = input.consumeJumpRequested() || input.isJumpHeld(); // Confirma se o jogador está a tentar saltar
-
         characterControl.getVelocity(velocidadeTmp); //Obter a velocidade do jogador
-        boolean paradoVerticalmente = Math.abs(velocidadeTmp.y) < MAX_VERTICAL_SPEED_TO_JUMP; //Verifica se o jogador está parado verticalmente
+        boolean canJump = jumpCooldownTimer <= 0f && characterControl.isOnGround() && velocidadeTmp.y <= MAX_VERTICAL_SPEED_TO_JUMP;
 
-        //Verificar se o jopgador está a tentar saltar, se o cooldown do salto terminou, se o jogador está parado verticalmente e se o jogador está no chão
-        if (jumpRequested && jumpCooldownTimer <= 0f && paradoVerticalmente && characterControl.isOnGround()) {
+        //Verificar se o jogador está a tentar saltar, e se pode saltar (cooldown, no chão e velocidade vertical baixa)
+        if (input.consumeJumpRequested() || input.isJumpHeld() && canJump) {
             characterControl.jump();
             jumpCooldownTimer = JUMP_COOLDOWN_TIME; //Inicia o cooldown do salto
         }
