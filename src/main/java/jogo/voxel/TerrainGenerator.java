@@ -55,12 +55,12 @@ public class TerrainGenerator {
 
        //Grass layer
         if (y == alturaSuperficie ) {
-            return VoxelPalette.STONE_ID; 
+            return VoxelPalette.WOOD_ID; 
         }
 
         // Terra Layer
         if (y >= alturaSuperficie - 2) {
-            return VoxelPalette.STONE_ID; 
+            return VoxelPalette.DIRT_ID; 
         }
 
         return VoxelPalette.STONE_ID;
