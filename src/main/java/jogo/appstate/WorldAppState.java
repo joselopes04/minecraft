@@ -12,8 +12,8 @@ import com.jme3.math.Vector3f;
 import com.jme3.renderer.Camera;
 import com.jme3.scene.Node;
 
-import jogo.voxel.TerrainGenerator;
 import jogo.voxel.VoxelWorld;
+import jogo.voxel.terrainGenerator.TerrainGenerator;
 
 public class WorldAppState extends BaseAppState {
 
@@ -58,7 +58,7 @@ public class WorldAppState extends BaseAppState {
 
         // Voxel world criado com base no terrain generator
         TerrainGenerator generator = new TerrainGenerator("IscteCraft2026");
-        voxelWorld = new VoxelWorld(assetManager, 320, 32, 320, generator);
+        voxelWorld = new VoxelWorld(assetManager, 640, 127, 640, generator);
         voxelWorld.generateLayers();
         voxelWorld.buildMeshes();
         voxelWorld.clearAllDirtyFlags();

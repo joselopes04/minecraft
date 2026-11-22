@@ -64,10 +64,10 @@ public class PlayerAppState extends BaseAppState {
 
         // BetterCharacterControl(radius, height, mass)
         characterControl = new BetterCharacterControl(0.42f, 1.8f, 80f);
-        characterControl.setJumpForce(new Vector3f(0, 400f, 0));
+        characterControl.setJumpForce(new Vector3f(0, 1500f, 0));
         playerNode.addControl(characterControl);
         physicsSpace.add(characterControl);
-        characterControl.setGravity(new Vector3f(0, -24f, 0));
+        characterControl.setGravity(new Vector3f(0, -5, 0));
 
         // Local light source that follows the player's head
         playerLight = new PointLight();
@@ -79,7 +79,7 @@ public class PlayerAppState extends BaseAppState {
         respawn();
 
         // initialize camera
-        cam.setFrustumPerspective(60f, (float) cam.getWidth() / cam.getHeight(), 0.05f, 500f);
+            cam.setFrustumPerspective(60f, (float) cam.getWidth() / cam.getHeight(), 0.05f, 500f);
         applyViewToCamera();
     }
 

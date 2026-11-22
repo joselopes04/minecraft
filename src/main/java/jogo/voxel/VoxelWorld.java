@@ -11,6 +11,7 @@ import com.jme3.scene.Geometry;
 import com.jme3.scene.Node;
 import com.jme3.texture.Texture2D;
 import jogo.util.ProcTextures;
+import jogo.voxel.terrainGenerator.TerrainGenerator;
 
 import java.util.HashMap;
 import java.util.Map;
