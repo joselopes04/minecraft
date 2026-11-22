@@ -36,6 +36,11 @@ public class PlayerAppState extends BaseAppState {
     private float mouseSensitivity = 30f; // degrees per mouse analog unit
     private float eyeHeight = 1.7f;
 
+    private static final float JUMP_COOLDOWN_TIME = 0.20f;//Evitar o double jump.
+    private float jumpCooldownTimer = 0f; //Temporizador para o cooldown do salto
+    private static final float MAX_VERTICAL_SPEED_TO_JUMP = 2.0f; //Velocidade vertical para o jogador poder saltar
+    private final Vector3f velocidadeTmp = new Vector3f(); //Vetor para ler a velocidade do jogador
+
     private Vector3f spawnPosition = new Vector3f(25.5f, 12f, 25.5f);
     private PointLight playerLight;
     private boolean wasInWater = false;
@@ -62,8 +67,9 @@ public class PlayerAppState extends BaseAppState {
 
         player = new Player();
 
-        characterControl = new BetterCharacterControl(0.30f, 1.75f, 80f);
-        characterControl.setJumpForce(new Vector3f(0, 400f, 0));
+        // BetterCharacterControl(radius, height, mass)
+        characterControl = new BetterCharacterControl(0.42f, 1.8f, 80f);
+        characterControl.setJumpForce(new Vector3f(0, 540f, 0));
         playerNode.addControl(characterControl);
         physicsSpace.add(characterControl);
         characterControl.setGravity(new Vector3f(0, -24f, 0));
@@ -147,24 +153,36 @@ public class PlayerAppState extends BaseAppState {
         }
         float speed = inWater ? (moveSpeed * 0.65f) : (moveSpeed * (input.isSprinting() ? sprintMultiplier : 1f));
         characterControl.setWalkDirection(dir.mult(speed));
-
-        // 4. Salto em terra OU nadar para cima na água
-        if (inWater) {
-            if (input.consumeJumpRequested()) {
-                characterControl.setJumpForce(new Vector3f(0, 480f, 0));
-                characterControl.jump();
-            }
-        } else {
-            if (input.consumeJumpRequested() && characterControl.isOnGround()) {
-                characterControl.setJumpForce(new Vector3f(0, 400f, 0));
-                characterControl.jump();
-            }
-        }
+        //Jump
+        updateJump(tpf,inWater);
 
         applyViewToCamera();
 
         if (playerLight != null) playerLight.setPosition(playerNode.getWorldTranslation().add(0, eyeHeight, 0));
     }
+    private void updateJump(float tpf ,boolean inWater) {
+    jumpCooldownTimer = Math.max(0f, jumpCooldownTimer - tpf);
+
+    if (inWater) {
+        if (input.consumeJumpRequested() || input.isJumpHeld()) {
+            characterControl.setJumpForce(new Vector3f(0, 480f, 0));
+            characterControl.jump();
+        }
+    } else {
+        characterControl.getVelocity(velocidadeTmp);
+        boolean canJump = jumpCooldownTimer <= 0f 
+                && characterControl.isOnGround() 
+                && velocidadeTmp.y <= MAX_VERTICAL_SPEED_TO_JUMP;
+
+        if (canJump && (input.consumeJumpRequested() || input.isJumpHeld())) {
+            characterControl.setJumpForce(new Vector3f(0, 540f, 0));
+            characterControl.jump();
+            jumpCooldownTimer = JUMP_COOLDOWN_TIME;
+        }
+    }
+}
+
+    
 
     private void respawn() {
         characterControl.setWalkDirection(Vector3f.ZERO);
