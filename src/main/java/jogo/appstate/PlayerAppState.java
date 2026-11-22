@@ -143,7 +143,7 @@ public class PlayerAppState extends BaseAppState {
         boolean canJump = jumpCooldownTimer <= 0f && characterControl.isOnGround() && velocidadeTmp.y <= MAX_VERTICAL_SPEED_TO_JUMP;
 
         //Verificar se o jogador está a tentar saltar, e se pode saltar (cooldown, no chão e velocidade vertical baixa)
-        if (input.consumeJumpRequested() || input.isJumpHeld() && canJump) {
+        if (canJump && (input.consumeJumpRequested() || input.isJumpHeld() )) {
             characterControl.jump();
             jumpCooldownTimer = JUMP_COOLDOWN_TIME; //Inicia o cooldown do salto
         }
