@@ -23,6 +23,8 @@ public class Chunk {
     private final int chunkX, chunkY, chunkZ;
     private final byte[][][] vox;
     private final Node node;
+    private final Node solidNode = new Node("Solids");
+    private final Node liquidNode = new Node("Liquids");
 
     private boolean dirty = true;
 
@@ -36,6 +38,8 @@ public class Chunk {
         this.chunkZ = chunkZ;
         this.vox = new byte[SIZE][SIZE][SIZE];
         this.node = new Node("Chunk_" + chunkX + "," + chunkY + "," + chunkZ);
+        node.attachChild(solidNode);
+        node.attachChild(liquidNode);
     }
 
     public Node getNode() { return node; }
@@ -52,7 +56,8 @@ public class Chunk {
     // Build and attach mesh for this chunk
     public void buildMesh(AssetManager assetManager, VoxelPalette palette) {
         long start = System.nanoTime();
-        node.detachAllChildren();
+        solidNode.detachAllChildren();
+        liquidNode.detachAllChildren();
         Map<MeshKey, MeshBuilder> builders = new HashMap<>();
 
         for (int x = 0; x < SIZE; x++) {
@@ -94,7 +99,11 @@ public class Chunk {
                     g.setQueueBucket(RenderQueue.Bucket.Transparent);
                 }
 
-                node.attachChild(g);
+                if (palette.get(key.blockId) instanceof LiquidBlockType) {
+                    liquidNode.attachChild(g);
+                } else {
+                    solidNode.attachChild(g);
+                }
                 geomCount++;
             }
         }
@@ -117,26 +126,19 @@ public class Chunk {
             node.removeControl(rigidBody);
             rigidBody = null;
         }
-        if (node.getQuantity() > 0) {
+        if (solidNode.getQuantity() > 0) {
             if (node.getParent() == null) {
                 System.out.println("Warning: Chunk node [" + chunkX + "," + chunkY + "," + chunkZ + "] not attached to world node before physics update!");
             }
-            // Usa um nó vazio para não copiar filhos transparentes/líquidos do node original
             Node tempNode = new Node("TempPhysics");
             tempNode.setLocalTransform(node.getLocalTransform());
-            for (int i = 0; i < node.getQuantity(); i++) {
-                if (node.getChild(i) instanceof Geometry g) {
-                    // Ignora líquidos (transparentes ou com ID de água)
-                    if (g.getQueueBucket() == RenderQueue.Bucket.Transparent
-                            || g.getName().contains("_" + VoxelPalette.WATER_ID + "_")) {
-                        continue;
-                    }
+            for (int i = 0; i < solidNode.getQuantity(); i++) {
+                if (solidNode.getChild(i) instanceof Geometry g) {
                     Geometry gClone = g.clone(false);
                     gClone.setMesh(g.getMesh().deepClone());
                     tempNode.attachChild(gClone);
                 }
             }
-            // Só cria colisão se existir pelo menos um bloco sólido neste chunk
             if (tempNode.getQuantity() > 0) {
                 CollisionShape shape = CollisionShapeFactory.createMeshShape(tempNode);
                 rigidBody = new RigidBodyControl(shape, 0f);
