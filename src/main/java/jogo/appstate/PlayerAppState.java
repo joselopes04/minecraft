@@ -43,6 +43,8 @@ public class PlayerAppState extends BaseAppState {
 
     private Vector3f spawnPosition = new Vector3f(25.5f, 12f, 25.5f);
     private PointLight playerLight;
+    private boolean wasInWater = false;
+    private float debugTimer = 0f;
 
     public PlayerAppState(Node rootNode, AssetManager assetManager, Camera cam, InputAppState input, PhysicsSpace physicsSpace, WorldAppState world) {
         this.rootNode = rootNode;
@@ -56,7 +58,6 @@ public class PlayerAppState extends BaseAppState {
 
     @Override
     protected void initialize(Application app) {
-        // query world for recommended spawn now that it should be initialized
         if (world != null) {
             spawnPosition = world.getRecommendedSpawnPosition();
         }
@@ -64,7 +65,6 @@ public class PlayerAppState extends BaseAppState {
         playerNode = new Node("Player");
         rootNode.attachChild(playerNode);
 
-        // Engine-neutral player entity (no engine visuals here)
         player = new Player();
 
         // BetterCharacterControl(radius, height, mass)
@@ -74,39 +74,31 @@ public class PlayerAppState extends BaseAppState {
         physicsSpace.add(characterControl);
         characterControl.setGravity(new Vector3f(0, -24f, 0));
 
-        // Local light source that follows the player's head
         playerLight = new PointLight();
         playerLight.setColor(new com.jme3.math.ColorRGBA(0.6f, 0.55f, 0.5f, 1f));
         playerLight.setRadius(12f);
         rootNode.addLight(playerLight);
 
-        // Spawn at recommended location
         respawn();
 
-        // initialize camera
         cam.setFrustumPerspective(60f, (float) cam.getWidth() / cam.getHeight(), 0.05f, 500f);
         applyViewToCamera();
     }
 
     @Override
     public void update(float tpf) {
-        // respawn on request
         if (input.consumeRespawnRequested()) {
-            // refresh spawn from world in case terrain changed
             if (world != null) spawnPosition = world.getRecommendedSpawnPosition();
             respawn();
         }
 
-        // pause controls if mouse not captured
         if (!input.isMouseCaptured()) {
             characterControl.setWalkDirection(Vector3f.ZERO);
-            // keep light with player even when paused
             if (playerLight != null) playerLight.setPosition(playerNode.getWorldTranslation().add(0, eyeHeight, 0));
             applyViewToCamera();
             return;
         }
 
-        // handle mouse look
         Vector2f md = input.consumeMouseDelta();
         if (md.lengthSquared() != 0f) {
             float degX = md.x * mouseSensitivity;
@@ -116,57 +108,98 @@ public class PlayerAppState extends BaseAppState {
             pitch = FastMath.clamp(pitch, -FastMath.HALF_PI * 0.99f, FastMath.HALF_PI * 0.99f);
         }
 
-        // movement input in XZ plane based on camera yaw
+        // 1. Verifica se o jogador está dentro ou à superfície da água (apenas pés e corpo)
+        Vector3f pos = playerNode.getWorldTranslation();
+        int bx = (int) Math.floor(pos.x);
+        int byFeet = (int) Math.floor(pos.y + 0.2f);
+        int byBody = (int) Math.floor(pos.y + 1.0f);
+        int bz = (int) Math.floor(pos.z);
+
+        boolean inWater = false;
+        byte blockFeet = 0, blockBody = 0;
+        if (world != null) {
+            blockFeet = world.getBlockAt(bx, byFeet, bz);
+            blockBody = world.getBlockAt(bx, byBody, bz);
+            inWater = (blockFeet == jogo.voxel.VoxelPalette.WATER_ID
+                    || blockBody == jogo.voxel.VoxelPalette.WATER_ID);
+        }
+
+        // Log de diagnóstico a cada 0.5 segundos no terminal
+        debugTimer += tpf;
+        if (debugTimer >= 0.5f) {
+            debugTimer = 0f;
+            System.out.println(String.format("Pos(%.1f, %.2f, %.1f) | Feet=%d Body=%d | inWater=%b | onGround=%b",
+                    pos.x, pos.y, pos.z, blockFeet, blockBody, inWater, characterControl.isOnGround()));
+        }
+
+        // 2. Gravidade mais natural na água (-12f em vez de -4f, para afundar logo ao entrar)
+        if (inWater != wasInWater) {
+            if (inWater) {
+                characterControl.setGravity(new Vector3f(0, -12f, 0));
+            } else {
+                characterControl.setGravity(new Vector3f(0, -24f, 0));
+            }
+            wasInWater = inWater;
+        }
+
+        // 3. Movimento horizontal
         Vector3f wish = input.getMovementXZ();
         Vector3f dir = Vector3f.ZERO;
         if (wish.lengthSquared() > 0f) {
             dir = computeWorldMove(wish).normalizeLocal();
         }
-        float speed = moveSpeed * (input.isSprinting() ? sprintMultiplier : 1f);
+        float speed = inWater ? (moveSpeed * 0.65f) : (moveSpeed * (input.isSprinting() ? sprintMultiplier : 1f));
         characterControl.setWalkDirection(dir.mult(speed));
+        //Jump
+        updateJump(tpf, inWater);
 
-        // jump
-        updateJump(tpf);
-
-        // place camera at eye height above physics location
         applyViewToCamera();
 
-        // update light to follow head
         if (playerLight != null) playerLight.setPosition(playerNode.getWorldTranslation().add(0, eyeHeight, 0));
     }
 
-    //Método para gerir a lógica do salto
-    private void updateJump(float tpf) {
-        jumpCooldownTimer = Math.max(0f, jumpCooldownTimer - tpf);//Atualiza o temporizador do cooldown do salto
+    private void updateJump(float tpf, boolean inWater) {
+        jumpCooldownTimer = Math.max(0f, jumpCooldownTimer - tpf);
 
-        characterControl.getVelocity(velocidadeTmp); //Obter a velocidade do jogador
-        boolean canJump = jumpCooldownTimer <= 0f && characterControl.isOnGround() && velocidadeTmp.y <= MAX_VERTICAL_SPEED_TO_JUMP;
+        if (inWater) {
+            characterControl.getVelocity(velocidadeTmp);
+            // Permite nadar para cima com impulsos controlados sem acumulação exponencial de velocidade
+            if (jumpCooldownTimer <= 0f
+                    && (input.consumeJumpRequested() || input.isJumpHeld())
+                    && velocidadeTmp.y <= MAX_VERTICAL_SPEED_TO_JUMP) {
+                characterControl.setJumpForce(new Vector3f(0, 500f, 0));
+                characterControl.jump();
+                jumpCooldownTimer = 0.25f; // Cooldown entre impulsos na água
+            }
+        } else {
+            characterControl.getVelocity(velocidadeTmp);
+            boolean canJump = jumpCooldownTimer <= 0f
+                    && characterControl.isOnGround()
+                    && velocidadeTmp.y <= MAX_VERTICAL_SPEED_TO_JUMP;
 
-        //Verificar se o jogador está a tentar saltar, e se pode saltar (cooldown, no chão e velocidade vertical baixa)
-        if (canJump && (input.consumeJumpRequested() || input.isJumpHeld() )) {
-            characterControl.jump();
-            jumpCooldownTimer = JUMP_COOLDOWN_TIME; //Inicia o cooldown do salto
+            if (canJump && (input.consumeJumpRequested() || input.isJumpHeld())) {
+                characterControl.setJumpForce(new Vector3f(0, 540f, 0));
+                characterControl.jump();
+                jumpCooldownTimer = JUMP_COOLDOWN_TIME;
+            }
         }
     }
 
     private void respawn() {
         characterControl.setWalkDirection(Vector3f.ZERO);
         characterControl.warp(spawnPosition);
-        // Look down at the single block directly beneath the spawn point.
         this.yaw = 0f;
         this.pitch = -1.4f;
         applyViewToCamera();
     }
 
     private Vector3f computeWorldMove(Vector3f inputXZ) {
-        // Match movement to the horizontal camera axes; input -Z means forward.
         Vector3f forward = new Vector3f(-FastMath.sin(yaw), 0, -FastMath.cos(yaw));
         Vector3f right = new Vector3f(FastMath.cos(yaw), 0, -FastMath.sin(yaw));
         return right.mult(inputXZ.x).addLocal(forward.mult(-inputXZ.z));
     }
 
     private void applyViewToCamera() {
-        // Character world location (spatial is synced by control)
         Vector3f loc = playerNode.getWorldTranslation().add(0, eyeHeight, 0);
         cam.setLocation(loc);
         float cosPitch = FastMath.cos(pitch);
