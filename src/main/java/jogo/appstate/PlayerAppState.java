@@ -108,31 +108,28 @@ public class PlayerAppState extends BaseAppState {
             pitch = FastMath.clamp(pitch, -FastMath.HALF_PI * 0.99f, FastMath.HALF_PI * 0.99f);
         }
 
-        // 1. Verifica se o jogador está dentro ou à superfície da água
+        // 1. Verifica se o jogador está dentro ou à superfície da água (apenas pés e corpo)
         Vector3f pos = playerNode.getWorldTranslation();
         int bx = (int) Math.floor(pos.x);
-        int byUnder = (int) Math.floor(pos.y - 0.1f);
-        int byFeet  = (int) Math.floor(pos.y + 0.2f);
-        int byBody  = (int) Math.floor(pos.y + 1.0f);
+        int byFeet = (int) Math.floor(pos.y + 0.2f);
+        int byBody = (int) Math.floor(pos.y + 1.0f);
         int bz = (int) Math.floor(pos.z);
 
         boolean inWater = false;
-        byte blockUnder = 0, blockFeet = 0, blockBody = 0;
+        byte blockFeet = 0, blockBody = 0;
         if (world != null) {
-            blockUnder = world.getBlockAt(bx, byUnder, bz);
-            blockFeet  = world.getBlockAt(bx, byFeet, bz);
-            blockBody  = world.getBlockAt(bx, byBody, bz);
-            inWater = (blockUnder == jogo.voxel.VoxelPalette.WATER_ID
-                    || blockFeet  == jogo.voxel.VoxelPalette.WATER_ID
-                    || blockBody  == jogo.voxel.VoxelPalette.WATER_ID);
+            blockFeet = world.getBlockAt(bx, byFeet, bz);
+            blockBody = world.getBlockAt(bx, byBody, bz);
+            inWater = (blockFeet == jogo.voxel.VoxelPalette.WATER_ID
+                    || blockBody == jogo.voxel.VoxelPalette.WATER_ID);
         }
 
         // Log de diagnóstico a cada 0.5 segundos no terminal
         debugTimer += tpf;
         if (debugTimer >= 0.5f) {
             debugTimer = 0f;
-            System.out.println(String.format("Pos(%.1f, %.2f, %.1f) | Under=%d Feet=%d | inWater=%b | onGround=%b",
-                    pos.x, pos.y, pos.z, blockUnder, blockFeet, inWater, characterControl.isOnGround()));
+            System.out.println(String.format("Pos(%.1f, %.2f, %.1f) | Feet=%d Body=%d | inWater=%b | onGround=%b",
+                    pos.x, pos.y, pos.z, blockFeet, blockBody, inWater, characterControl.isOnGround()));
         }
 
         // 2. Gravidade mais natural na água (-12f em vez de -4f, para afundar logo ao entrar)
@@ -154,35 +151,39 @@ public class PlayerAppState extends BaseAppState {
         float speed = inWater ? (moveSpeed * 0.65f) : (moveSpeed * (input.isSprinting() ? sprintMultiplier : 1f));
         characterControl.setWalkDirection(dir.mult(speed));
         //Jump
-        updateJump(tpf,inWater);
+        updateJump(tpf, inWater);
 
         applyViewToCamera();
 
         if (playerLight != null) playerLight.setPosition(playerNode.getWorldTranslation().add(0, eyeHeight, 0));
     }
-    private void updateJump(float tpf ,boolean inWater) {
-    jumpCooldownTimer = Math.max(0f, jumpCooldownTimer - tpf);
 
-    if (inWater) {
-        if (input.consumeJumpRequested() || input.isJumpHeld()) {
-            characterControl.setJumpForce(new Vector3f(0, 480f, 0));
-            characterControl.jump();
-        }
-    } else {
-        characterControl.getVelocity(velocidadeTmp);
-        boolean canJump = jumpCooldownTimer <= 0f 
-                && characterControl.isOnGround() 
-                && velocidadeTmp.y <= MAX_VERTICAL_SPEED_TO_JUMP;
+    private void updateJump(float tpf, boolean inWater) {
+        jumpCooldownTimer = Math.max(0f, jumpCooldownTimer - tpf);
 
-        if (canJump && (input.consumeJumpRequested() || input.isJumpHeld())) {
-            characterControl.setJumpForce(new Vector3f(0, 540f, 0));
-            characterControl.jump();
-            jumpCooldownTimer = JUMP_COOLDOWN_TIME;
+        if (inWater) {
+            characterControl.getVelocity(velocidadeTmp);
+            // Permite nadar para cima com impulsos controlados sem acumulação exponencial de velocidade
+            if (jumpCooldownTimer <= 0f
+                    && (input.consumeJumpRequested() || input.isJumpHeld())
+                    && velocidadeTmp.y <= MAX_VERTICAL_SPEED_TO_JUMP) {
+                characterControl.setJumpForce(new Vector3f(0, 500f, 0));
+                characterControl.jump();
+                jumpCooldownTimer = 0.25f; // Cooldown entre impulsos na água
+            }
+        } else {
+            characterControl.getVelocity(velocidadeTmp);
+            boolean canJump = jumpCooldownTimer <= 0f
+                    && characterControl.isOnGround()
+                    && velocidadeTmp.y <= MAX_VERTICAL_SPEED_TO_JUMP;
+
+            if (canJump && (input.consumeJumpRequested() || input.isJumpHeld())) {
+                characterControl.setJumpForce(new Vector3f(0, 540f, 0));
+                characterControl.jump();
+                jumpCooldownTimer = JUMP_COOLDOWN_TIME;
+            }
         }
     }
-}
-
-    
 
     private void respawn() {
         characterControl.setWalkDirection(Vector3f.ZERO);

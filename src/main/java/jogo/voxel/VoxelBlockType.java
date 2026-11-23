@@ -77,8 +77,8 @@ public abstract class VoxelBlockType {
         m.setTexture("DiffuseMap", tex);
         m.setBoolean("UseMaterialColors", true);
         m.setColor("Diffuse", ColorRGBA.White);
+        m.setFloat("Shininess", 0f);
         m.setColor("Specular", ColorRGBA.White.mult(0.02f));
-        m.setFloat("Shininess", 32f);
         return m;
     }
 
