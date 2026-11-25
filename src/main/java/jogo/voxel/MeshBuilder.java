@@ -12,40 +12,47 @@ public class MeshBuilder {
     private final List<Float> positions = new ArrayList<>();
     private final List<Float> normals = new ArrayList<>();
     private final List<Float> uvs = new ArrayList<>();
+    private final List<Float> colors = new ArrayList<>(); // <-- ADICIONE ESTA LINHA(Pedro)
     private final List<Integer> indices = new ArrayList<>();
 
     // Optional: enable per-block UV randomization for variety
     private boolean randomizeUV = false;
-
     public void setRandomizeUV(boolean randomizeUV) {
         this.randomizeUV = randomizeUV;
     }
 
-    public int addVertex(Vector3f p, Vector3f n, Vector2f uv) {
+        public int addVertex(Vector3f p, Vector3f n, Vector2f uv, float shade) {
         int idx = positions.size() / 3;
         positions.add(p.x); positions.add(p.y); positions.add(p.z);
         normals.add(n.x); normals.add(n.y); normals.add(n.z);
         uvs.add(uv.x); uvs.add(uv.y);
+        // Salva os 4 canais RGBA: o 'shade' define o quão claro ou escuro o vértice é
+        colors.add(shade); colors.add(shade); colors.add(shade); colors.add(1.0f);
         return idx;
     }
 
+    // Mantido caso algo no projeto chame sem o shade (usa 1.0f como padrão)
+    public int addVertex(Vector3f p, Vector3f n, Vector2f uv) {
+        return addVertex(p, n, uv, 1.0f);
+    }
+
     public void addQuad(Vector3f v0, Vector3f v1, Vector3f v2, Vector3f v3, Vector3f normal) {
-        int i0 = addVertex(v0, normal, new Vector2f(0,0));
-        int i1 = addVertex(v1, normal, new Vector2f(0,1));
-        int i2 = addVertex(v2, normal, new Vector2f(1,1));
-        int i3 = addVertex(v3, normal, new Vector2f(1,0));
+        int i0 = addVertex(v0, normal, new Vector2f(0,0), 1.0f);
+        int i1 = addVertex(v1, normal, new Vector2f(0,1), 1.0f);
+        int i2 = addVertex(v2, normal, new Vector2f(1,1), 1.0f);
+        int i3 = addVertex(v3, normal, new Vector2f(1,0), 1.0f);
         // CCW triangles
         indices.add(i0); indices.add(i1); indices.add(i2);
         indices.add(i0); indices.add(i2); indices.add(i3);
     }
 
-    // Add a quad with explicit UVs
+    // Add a quad with explicit UVs e o valor de sombra (shade)
     private void addQuadUV(Vector3f v0, Vector3f v1, Vector3f v2, Vector3f v3, Vector3f normal,
-                           Vector2f uv0, Vector2f uv1, Vector2f uv2, Vector2f uv3) {
-        int i0 = addVertex(v0, normal, uv0);
-        int i1 = addVertex(v1, normal, uv1);
-        int i2 = addVertex(v2, normal, uv2);
-        int i3 = addVertex(v3, normal, uv3);
+                           Vector2f uv0, Vector2f uv1, Vector2f uv2, Vector2f uv3, float shade) {
+        int i0 = addVertex(v0, normal, uv0, shade);
+        int i1 = addVertex(v1, normal, uv1, shade);
+        int i2 = addVertex(v2, normal, uv2, shade);
+        int i3 = addVertex(v3, normal, uv3, shade);
         indices.add(i0); indices.add(i1); indices.add(i2);
         indices.add(i0); indices.add(i2); indices.add(i3);
     }
@@ -82,8 +89,16 @@ public class MeshBuilder {
         return new Vector2f(ru + 0.5f, rv + 0.5f);
     }
 
-    public void addVoxelFace(int x, int y, int z, Face face) {
+        public void addVoxelFace(int x, int y, int z, Face face) {
         float xf = x, yf = y, zf = z;
+
+        // Fatores de luz idênticos ao Minecraft vanilla:
+        float shade = switch (face) {
+            case PY -> 1.0f; // Topo (100% de luz)
+            case PZ, NZ -> 0.8f; // Frente / Trás (80%)
+            case PX, NX -> 0.6f; // Lados Leste / Oeste (60%)
+            case NY -> 0.5f; // Fundo / Baixo (50%)
+        };
 
         int rot = 0; boolean flipU = false; boolean flipV = false;
         if (randomizeUV) {
@@ -102,27 +117,27 @@ public class MeshBuilder {
         switch (face) {
             case PX -> addQuadUV(
                     new Vector3f(xf+1, yf,   zf  ), new Vector3f(xf+1, yf+1, zf  ), new Vector3f(xf+1, yf+1, zf+1), new Vector3f(xf+1, yf,   zf+1), FaceNormals.PX,
-                    uv00, uv01, uv11, uv10
+                    uv00, uv01, uv11, uv10, shade
             );
             case NX -> addQuadUV(
                     new Vector3f(xf,   yf,   zf+1), new Vector3f(xf,   yf+1, zf+1), new Vector3f(xf,   yf+1, zf  ), new Vector3f(xf,   yf,   zf  ), FaceNormals.NX,
-                    uv00, uv01, uv11, uv10
+                    uv00, uv01, uv11, uv10, shade
             );
             case PY -> addQuadUV(
                     new Vector3f(xf,   yf+1, zf  ), new Vector3f(xf,   yf+1, zf+1), new Vector3f(xf+1, yf+1, zf+1), new Vector3f(xf+1, yf+1, zf  ), FaceNormals.PY,
-                    uv00, uv01, uv11, uv10
+                    uv00, uv01, uv11, uv10, shade
             );
             case NY -> addQuadUV(
                     new Vector3f(xf+1, yf,   zf  ), new Vector3f(xf+1, yf,   zf+1), new Vector3f(xf,   yf,   zf+1), new Vector3f(xf,   yf,   zf  ), FaceNormals.NY,
-                    uv00, uv01, uv11, uv10
+                    uv00, uv01, uv11, uv10, shade
             );
             case PZ -> addQuadUV(
                     new Vector3f(xf,   yf,   zf+1), new Vector3f(xf+1, yf,   zf+1), new Vector3f(xf+1, yf+1, zf+1), new Vector3f(xf,   yf+1, zf+1), FaceNormals.PZ,
-                    uv00, uv10, uv11, uv01
+                    uv00, uv10, uv11, uv01, shade
             );
             case NZ -> addQuadUV(
                     new Vector3f(xf+1, yf,   zf  ), new Vector3f(xf,   yf,   zf  ), new Vector3f(xf,   yf+1, zf  ), new Vector3f(xf+1, yf+1, zf  ), FaceNormals.NZ,
-                    uv00, uv10, uv11, uv01
+                    uv00, uv10, uv11, uv01, shade
             );
         }
     }
@@ -141,10 +156,12 @@ public class MeshBuilder {
         float[] pos = toFloatArray(positions);
         float[] nor = toFloatArray(normals);
         float[] tc = toFloatArray(uvs);
+        float[] col = toFloatArray(colors); // <-- Converte a lista de cores em array
         int[] idx = indices.stream().mapToInt(Integer::intValue).toArray();
         mesh.setBuffer(VertexBuffer.Type.Position, 3, pos);
         mesh.setBuffer(VertexBuffer.Type.Normal, 3, nor);
         mesh.setBuffer(VertexBuffer.Type.TexCoord, 2, tc);
+        mesh.setBuffer(VertexBuffer.Type.Color, 4, col); // <-- Registra o buffer de cores no Mesh
         mesh.setBuffer(VertexBuffer.Type.Index, 3, idx);
         mesh.updateBound();
         mesh.updateCounts();

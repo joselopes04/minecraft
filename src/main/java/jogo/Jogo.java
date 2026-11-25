@@ -3,17 +3,19 @@ package jogo;
 import com.jme3.app.SimpleApplication;
 import com.jme3.bullet.BulletAppState;
 import com.jme3.bullet.PhysicsSpace;
-import com.jme3.system.AppSettings;
 import com.jme3.math.ColorRGBA;
 import com.jme3.post.FilterPostProcessor;
-import jogo.appstate.InputAppState;
-import jogo.appstate.PlayerAppState;
-import jogo.appstate.WorldAppState;
+import com.jme3.system.AppSettings;
+
 import jogo.appstate.HudAppState;
-import jogo.appstate.RenderAppState;
+import jogo.appstate.InputAppState;
 import jogo.appstate.InteractionAppState;
+import jogo.appstate.PlayerAppState;
+import jogo.appstate.RenderAppState;
+import jogo.appstate.WorldAppState;
 import jogo.engine.GameRegistry;
 import jogo.engine.RenderIndex;
+import jogo.gameobject.character.Player;
 
 /**
  * Main application entry.
@@ -66,31 +68,35 @@ public class Jogo extends SimpleApplication {
         GameRegistry registry = new GameRegistry();
         RenderIndex renderIndex = new RenderIndex();
         stateManager.attach(new RenderAppState(rootNode, assetManager, registry, renderIndex));
-        stateManager.attach(new InteractionAppState(rootNode, cam, input, renderIndex, world));
 
-        // Demo objects
-        // Chest chest = new Chest();
-        // chest.setPosition(26.5f, world.getRecommendedSpawnPosition().y - 2f, 26.5f);
-        // registry.add(chest);
+        // Shared Player instance for decoupling and consistency across systems
+        // A mesma instância da entidade lógica Player é partilhada entre os AppStates:
+        // - PlayerAppState: atualiza posição, câmara e física do jogador
+        // - InteractionAppState: acede e altera o estado do contentor aberto do jogador
+        // - HudAppState: observa o contentor aberto para desenhar a interface e libertar o rato, de modo interagir com os itens lá presentes
+        Player player = new Player();
 
-        PlayerAppState player = new PlayerAppState(rootNode, assetManager, cam, input, physicsSpace, world);
-        stateManager.attach(player);
+        PlayerAppState playerAppState = new PlayerAppState(rootNode, assetManager, cam, input, physicsSpace, world, player);
+        stateManager.attach(playerAppState);
+
+        InteractionAppState interactionAppState = new InteractionAppState(rootNode, cam, input, renderIndex, world, player);
+        stateManager.attach(interactionAppState);
 
         // Post-processing: SSAO for subtle contact shadows
-        // try {
-        //     FilterPostProcessor fpp = new FilterPostProcessor(assetManager);
-        //     Class<?> ssaoCls = Class.forName("com.jme3.post.ssao.SSAOFilter");
-        //     Object ssao = ssaoCls.getConstructor(float.class, float.class, float.class, float.class)
-        //             .newInstance(2.1f, 0.6f, 0.5f, 0.02f); // radius, intensity, scale, bias
-        //     // Add filter via reflection to avoid compile-time dependency
-        //     java.lang.reflect.Method addFilter = FilterPostProcessor.class.getMethod("addFilter", Class.forName("com.jme3.post.Filter"));
-        //     addFilter.invoke(fpp, ssao);
-        //     viewPort.addProcessor(fpp);
-        // } catch (Exception e) {
-          //   System.out.println("SSAO not available (effects module missing?): " + e.getMessage());
-        // }
+      /*  try {
+            FilterPostProcessor fpp = new FilterPostProcessor(assetManager);
+            Class<?> ssaoCls = Class.forName("com.jme3.post.ssao.SSAOFilter");
+            Object ssao = ssaoCls.getConstructor(float.class, float.class, float.class, float.class)
+                    .newInstance(2.1f, 0.6f, 0.5f, 0.02f); // radius, intensity, scale, bias
+            // Add filter via reflection to avoid compile-time dependency
+            java.lang.reflect.Method addFilter = FilterPostProcessor.class.getMethod("addFilter", Class.forName("com.jme3.post.Filter"));
+            addFilter.invoke(fpp, ssao);
+            viewPort.addProcessor(fpp);
+        } catch (Exception e) {
+            System.out.println("SSAO not available (effects module missing?): " + e.getMessage());
+        }*/
 
-        // HUD (just a crosshair for now)
-        stateManager.attach(new HudAppState(guiNode, assetManager));
+        // HUD (crosshair and reactive container UI)
+        stateManager.attach(new HudAppState(guiNode, assetManager, input, player));
     }
 }

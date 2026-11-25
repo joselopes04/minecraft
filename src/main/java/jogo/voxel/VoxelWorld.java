@@ -1,5 +1,9 @@
 package jogo.voxel;
 
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Optional;
+
 import com.jme3.asset.AssetManager;
 import com.jme3.bullet.PhysicsSpace;
 import com.jme3.material.Material;
@@ -12,12 +16,11 @@ import com.jme3.scene.Node;
 import com.jme3.texture.Texture2D;
 
 import jogo.WorldConfig;
+import jogo.interaction.BlockPos;
+import jogo.inventory.Container;
 import jogo.util.ProcTextures;
 import jogo.voxel.terrainGenerator.TerrainGenerator;
 
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Optional;
 
 public class VoxelWorld {
     private final AssetManager assetManager;
@@ -27,6 +30,10 @@ public class VoxelWorld {
     private final Node node = new Node("VoxelWorld");
     private final Map<Byte, Geometry> geoms = new HashMap<>();
     private final Map<Byte, Material> materials = new HashMap<>();
+
+    // Mapa de metadados dinâmicos: associa coordenadas de blocos (BlockPos) aos seus inventários (Container).
+    // Permite que os blocos voxel (que internamente são apenas bytes de ID) possuam estado e inventário.
+    private final Map<BlockPos, Container> containers = new HashMap<>();
 
     private boolean lit = true;       // Shading: On by default
     private boolean wireframe = false; // Wireframe: Off by default
@@ -101,7 +108,38 @@ public class VoxelWorld {
     public boolean breakAt(int x, int y, int z) {
         if (!inBounds(x,y,z)) return false;
         setBlock(x, y, z, VoxelPalette.AIR_ID);
+        // Quando um bloco é destruído, liberta o contentor/inventário associado a essa posição
+        removeContainer(new BlockPos(x, y, z));
         return true;
+    }
+
+    /**
+     * Obtém o contentor associado à posição ou cria um novo com o título e tamanho indicados.
+     */
+    public Container getOrCreateContainer(BlockPos pos, String title, int slots) {
+        return containers.computeIfAbsent(pos, p -> new Container(title, slots));
+    }
+
+    /**
+     * Obtém o contentor existente numa posição específica (ou null se não existir).
+     */
+    public Container getContainer(BlockPos pos) {
+        return containers.get(pos);
+    }
+
+    /**
+     * Remove o contentor associado à posição (neste caso, quando o mesmo é destruído).
+     */
+    public void removeContainer(BlockPos pos) {
+        containers.remove(pos);
+    }
+
+    /**
+     * Retorna o VoxelBlockType presente nas coordenadas inteiras fornecidas,
+     * convertendo o ID do bloco através da paleta do mundo.
+     */
+    public VoxelBlockType getBlockType(int x, int y, int z) {
+        return palette.get(getBlock(x, y, z));
     }
 
     public Node getNode() { return node; }
@@ -228,6 +266,72 @@ public class VoxelWorld {
             if (isSolid(x,y,z)) return Optional.of(new Vector3i(x,y,z));
         }
         return Optional.empty();
+    }
+
+    /**
+     * Determina a célula de ar imediatamente adjacente à face do bloco sólido que o jogador está a olhar,
+     * para permitir colocar um novo bloco nessa posição.
+     * Utiliza a mesma travessia DDA de {@link #pickFirstSolid(Camera, float)}, guardando a última
+     * célula vazia atravessada (prevX, prevY, prevZ) antes de atingir o bloco sólido.
+     */
+    public Optional<Vector3i> pickPlaceTarget(Camera cam, float maxDistance) {
+        Vector3f origin = cam.getLocation();
+        Vector3f dir = cam.getDirection().normalize();
+
+        int x = (int) Math.floor(origin.x);
+        int y = (int) Math.floor(origin.y);
+        int z = (int) Math.floor(origin.z);
+
+        int stepX = dir.x > 0 ? 1 : -1;
+        int stepY = dir.y > 0 ? 1 : -1;
+        int stepZ = dir.z > 0 ? 1 : -1;
+
+        float nextVoxelBoundaryX = x + (stepX > 0 ? 1 : 0);
+        float nextVoxelBoundaryY = y + (stepY > 0 ? 1 : 0);
+        float nextVoxelBoundaryZ = z + (stepZ > 0 ? 1 : 0);
+
+        float tMaxX = (dir.x != 0) ? (nextVoxelBoundaryX - origin.x) / dir.x : Float.POSITIVE_INFINITY;
+        float tMaxY = (dir.y != 0) ? (nextVoxelBoundaryY - origin.y) / dir.y : Float.POSITIVE_INFINITY;
+        float tMaxZ = (dir.z != 0) ? (nextVoxelBoundaryZ - origin.z) / dir.z : Float.POSITIVE_INFINITY;
+
+        float tDeltaX = (dir.x != 0) ? stepX / dir.x : Float.POSITIVE_INFINITY;
+        float tDeltaY = (dir.y != 0) ? stepY / dir.y : Float.POSITIVE_INFINITY;
+        float tDeltaZ = (dir.z != 0) ? stepZ / dir.z : Float.POSITIVE_INFINITY;
+
+        float t = 0f;
+        if (inBounds(x, y, z) && isSolid(x, y, z)) return Optional.empty();
+
+        while (t <= maxDistance) {
+            int prevX = x;
+            int prevY = y;
+            int prevZ = z;
+
+            if (tMaxX < tMaxY) {
+                if (tMaxX < tMaxZ) { x += stepX; t = tMaxX; tMaxX += tDeltaX; }
+                else { z += stepZ; t = tMaxZ; tMaxZ += tDeltaZ; }
+            } else {
+                if (tMaxY < tMaxZ) { y += stepY; t = tMaxY; tMaxY += tDeltaY; }
+                else { z += stepZ; t = tMaxZ; tMaxZ += tDeltaZ; }
+            }
+            if (!inBounds(x, y, z)) { if (t > maxDistance) break; continue; }
+            if (isSolid(x, y, z)) {
+                if (inBounds(prevX, prevY, prevZ) && !isSolid(prevX, prevY, prevZ)) {
+                    return Optional.of(new Vector3i(prevX, prevY, prevZ));
+                }
+                return Optional.empty();
+            }
+        }
+        return Optional.empty();
+    }
+
+    /**
+     * Coloca um bloco sólido nas coordenadas indicadas se a célula estiver livre e dentro dos limites,
+     * garantindo que não substitui blocos sólidos já existentes.
+     */
+    public boolean placeAt(int x, int y, int z, byte blockId) {
+        if (!inBounds(x, y, z) || isSolid(x, y, z)) return false;
+        setBlock(x, y, z, blockId);
+        return true;
     }
 
     private boolean isSolid(int x, int y, int z) {

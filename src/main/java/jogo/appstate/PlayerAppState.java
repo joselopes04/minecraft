@@ -11,6 +11,7 @@ import com.jme3.math.Vector2f;
 import com.jme3.math.Vector3f;
 import com.jme3.renderer.Camera;
 import com.jme3.scene.Node;
+
 import jogo.gameobject.character.Player;
 
 public class PlayerAppState extends BaseAppState {
@@ -21,10 +22,9 @@ public class PlayerAppState extends BaseAppState {
     private final InputAppState input;
     private final PhysicsSpace physicsSpace;
     private final WorldAppState world;
-
     private Node playerNode;
     private BetterCharacterControl characterControl;
-    private Player player;
+    private final Player player;
 
     // view angles
     private float yaw = 0f;
@@ -36,24 +36,35 @@ public class PlayerAppState extends BaseAppState {
     private float mouseSensitivity = 30f; // degrees per mouse analog unit
     private float eyeHeight = 1.7f;
 
-    private static final float JUMP_COOLDOWN_TIME = 0.20f;//Evitar o double jump.
-    private float jumpCooldownTimer = 0f; //Temporizador para o cooldown do salto
-    private static final float MAX_VERTICAL_SPEED_TO_JUMP = 2.0f; //Velocidade vertical para o jogador poder saltar
-    private final Vector3f velocidadeTmp = new Vector3f(); //Vetor para ler a velocidade do jogador
+    private static final float JUMP_COOLDOWN_TIME = 0.20f; // Evitar o double jump
+    private float jumpCooldownTimer = 0f; // Temporizador para o cooldown do salto
+    private static final float MAX_VERTICAL_SPEED_TO_JUMP = 2.0f; // Velocidade vertical para o jogador poder saltar
+    private final Vector3f velocidadeTmp = new Vector3f(); // Vetor para ler a velocidade do jogador
 
     private Vector3f spawnPosition = new Vector3f(25.5f, 12f, 25.5f);
     private PointLight playerLight;
     private boolean wasInWater = false;
     private float debugTimer = 0f;
 
-    public PlayerAppState(Node rootNode, AssetManager assetManager, Camera cam, InputAppState input, PhysicsSpace physicsSpace, WorldAppState world) {
+    public PlayerAppState(Node rootNode, AssetManager assetManager, Camera cam, InputAppState input, PhysicsSpace physicsSpace, WorldAppState world, Player player) {
         this.rootNode = rootNode;
         this.assetManager = assetManager;
         this.cam = cam;
         this.input = input;
         this.physicsSpace = physicsSpace;
         this.world = world;
-        world.registerPlayerAppState(this);
+        this.player = player != null ? player : new Player();
+        if (world != null) {
+            world.registerPlayerAppState(this);
+        }
+    }
+
+    public PlayerAppState(Node rootNode, AssetManager assetManager, Camera cam, InputAppState input, PhysicsSpace physicsSpace, WorldAppState world) {
+        this(rootNode, assetManager, cam, input, physicsSpace, world, new Player());
+    }
+
+    public Player getPlayer() {
+        return player;
     }
 
     @Override
@@ -65,8 +76,6 @@ public class PlayerAppState extends BaseAppState {
         playerNode = new Node("Player");
         rootNode.attachChild(playerNode);
 
-        player = new Player();
-
         // BetterCharacterControl(radius, height, mass)
         characterControl = new BetterCharacterControl(0.42f, 1.8f, 80f);
         characterControl.setJumpForce(new Vector3f(0, 540f, 0));
@@ -77,7 +86,7 @@ public class PlayerAppState extends BaseAppState {
         playerLight = new PointLight();
         playerLight.setColor(new com.jme3.math.ColorRGBA(0.6f, 0.55f, 0.5f, 1f));
         playerLight.setRadius(12f);
-        rootNode.addLight(playerLight);
+        //rootNode.addLight(playerLight);
 
         respawn();
 
@@ -97,6 +106,16 @@ public class PlayerAppState extends BaseAppState {
             if (playerLight != null) playerLight.setPosition(playerNode.getWorldTranslation().add(0, eyeHeight, 0));
             applyViewToCamera();
             return;
+        }
+
+        // Seleção da hotbar (teclas 1-9 e scroll do rato)
+        int requestedSlot = input.consumeRequestedHotbarSlot();
+        if (requestedSlot >= 0) {
+            player.setSelectedSlot(requestedSlot);
+        }
+        int scrollDelta = input.consumeHotbarScrollDelta();
+        if (scrollDelta != 0) {
+            player.setSelectedSlot(player.getSelectedSlot() + scrollDelta);
         }
 
         Vector2f md = input.consumeMouseDelta();
@@ -124,14 +143,6 @@ public class PlayerAppState extends BaseAppState {
                     || blockBody == jogo.voxel.VoxelPalette.WATER_ID);
         }
 
-        // Log de diagnóstico a cada 0.5 segundos no terminal
-        debugTimer += tpf;
-        if (debugTimer >= 0.5f) {
-            debugTimer = 0f;
-            System.out.println(String.format("Pos(%.1f, %.2f, %.1f) | Feet=%d Body=%d | inWater=%b | onGround=%b",
-                    pos.x, pos.y, pos.z, blockFeet, blockBody, inWater, characterControl.isOnGround()));
-        }
-
         // 2. Gravidade mais natural na água (-12f em vez de -4f, para afundar logo ao entrar)
         if (inWater != wasInWater) {
             if (inWater) {
@@ -150,7 +161,8 @@ public class PlayerAppState extends BaseAppState {
         }
         float speed = inWater ? (moveSpeed * 0.65f) : (moveSpeed * (input.isSprinting() ? sprintMultiplier : 1f));
         characterControl.setWalkDirection(dir.mult(speed));
-        //Jump
+
+        // 4. Salto / Nadar
         updateJump(tpf, inWater);
 
         applyViewToCamera();

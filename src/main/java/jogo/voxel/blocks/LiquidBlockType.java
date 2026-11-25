@@ -23,18 +23,24 @@ public abstract class LiquidBlockType extends VoxelBlockType {
         return true;
     }
 
-    @Override
+        @Override
     protected Material loadBlockMaterial(AssetManager assetManager, String texturePath) {
         Material m = super.loadBlockMaterial(assetManager, texturePath);
         if (m != null && opacity < 1.0f) {
-            // Ativa transparência (Alpha Blending) para a água
-            m.setColor("Diffuse", new ColorRGBA(1f, 1f, 1f, opacity));
+            ColorRGBA tint = new ColorRGBA(1f, 1f, 1f, opacity);
+
+            // "Color" para Unshaded.j3md; "Diffuse" como fallback para Lighting.j3md
+            if (m.getMaterialDef().getMaterialParam("Color") != null) {
+                m.setColor("Color", tint);
+            } else if (m.getMaterialDef().getMaterialParam("Diffuse") != null) {
+                m.setColor("Diffuse", tint);
+            }
+
             m.getAdditionalRenderState().setBlendMode(RenderState.BlendMode.Alpha);
             m.getAdditionalRenderState().setDepthWrite(false);
         }
         return m;
     }
-
     public boolean isTransparent() {
         return opacity < 1.0f;
     }
