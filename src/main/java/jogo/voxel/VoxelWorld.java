@@ -77,8 +77,8 @@ public class VoxelWorld {
     private int ly(int y) { return y % chunkSize; }
     private int lz(int z) { return z % chunkSize; }
 
-    // Block access
     public byte getBlock(int x, int y, int z) {
+        if (!inBounds(x, y, z)) return VoxelPalette.AIR_ID;
         Chunk c = getChunk(x, y, z);
         if (c == null) return VoxelPalette.AIR_ID;
         return c.get(lx(x), ly(y), lz(z));
