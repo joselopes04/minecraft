@@ -11,6 +11,7 @@ import com.jme3.math.Vector2f;
 import com.jme3.math.Vector3f;
 import com.jme3.renderer.Camera;
 import com.jme3.scene.Node;
+
 import jogo.gameobject.character.Player;
 
 public class PlayerAppState extends BaseAppState {
@@ -24,7 +25,7 @@ public class PlayerAppState extends BaseAppState {
 
     private Node playerNode;
     private BetterCharacterControl characterControl;
-    private Player player;
+    private final Player player;
 
     // view angles
     private float yaw = 0f;
@@ -39,14 +40,34 @@ public class PlayerAppState extends BaseAppState {
     private Vector3f spawnPosition = new Vector3f(25.5f, 12f, 25.5f);
     private PointLight playerLight;
 
-    public PlayerAppState(Node rootNode, AssetManager assetManager, Camera cam, InputAppState input, PhysicsSpace physicsSpace, WorldAppState world) {
+    /**
+     * Construtor com injeção de dependência do Player.
+     * Permite que a mesma instância do Player seja partilhada com o InteractionAppState e HudAppState,
+     * evitando desfasamentos de estado ou NullPointerException durante a inicialização do motor.
+     */
+    public PlayerAppState(Node rootNode, AssetManager assetManager, Camera cam, InputAppState input, PhysicsSpace physicsSpace, WorldAppState world, Player player) {
         this.rootNode = rootNode;
         this.assetManager = assetManager;
         this.cam = cam;
         this.input = input;
         this.physicsSpace = physicsSpace;
         this.world = world;
+        this.player = player != null ? player : new Player();
         world.registerPlayerAppState(this);
+    }
+
+    /**
+     * Construtor de conveniência que instancia um novo Player caso nenhum seja fornecido.
+     */
+    public PlayerAppState(Node rootNode, AssetManager assetManager, Camera cam, InputAppState input, PhysicsSpace physicsSpace, WorldAppState world) {
+        this(rootNode, assetManager, cam, input, physicsSpace, world, new Player());
+    }
+
+    /**
+     * Fornece acesso direto e seguro à entidade lógica Player.
+     */
+    public Player getPlayer() {
+        return player;
     }
 
     @Override
@@ -58,9 +79,6 @@ public class PlayerAppState extends BaseAppState {
 
         playerNode = new Node("Player");
         rootNode.attachChild(playerNode);
-
-        // Engine-neutral player entity (no engine visuals here)
-        player = new Player();
 
         // BetterCharacterControl(radius, height, mass)
         characterControl = new BetterCharacterControl(0.42f, 1.8f, 80f);
@@ -99,6 +117,18 @@ public class PlayerAppState extends BaseAppState {
             if (playerLight != null) playerLight.setPosition(playerNode.getWorldTranslation().add(0, eyeHeight, 0));
             applyViewToCamera();
             return;
+        }
+
+        // Atualiza a seleção da hotbar via teclas 1-9 ou roda do rato.
+        // Mantém-se no PlayerAppState para respeitar a separação de responsabilidades:
+        // o PlayerAppState aplica inputs ao modelo Player, enquanto o HudAppState apenas observa e desenha.
+        int requestedSlot = input.consumeRequestedHotbarSlot();
+        if (requestedSlot >= 0) {
+            player.setSelectedSlot(requestedSlot);
+        }
+        int scrollDelta = input.consumeHotbarScrollDelta();
+        if (scrollDelta != 0) {
+            player.setSelectedSlot(player.getSelectedSlot() + scrollDelta);
         }
 
         // handle mouse look
