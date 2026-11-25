@@ -53,17 +53,17 @@ public class WorldAppState extends BaseAppState {
 
         // Lighting
         AmbientLight ambient = new AmbientLight();
-        ambient.setColor(ColorRGBA.White.mult(0.20f)); // slightly increased ambient
+        ambient.setColor(ColorRGBA.White.mult(0.75f));
         worldNode.addLight(ambient);
 
         DirectionalLight sun = new DirectionalLight();
         sun.setDirection(new Vector3f(-0.35f, -1.3f, -0.25f).normalizeLocal()); // more top-down to reduce harsh contrast
-        sun.setColor(ColorRGBA.White.mult(0.85f)); // slightly dimmer sun
+        sun.setColor(ColorRGBA.White.mult(0.25f)); // slightly dimmer sun
         worldNode.addLight(sun);
 
         // Voxel world criado com base no terrain generator
         TerrainGenerator generator = new TerrainGenerator("IscteCraft2026");
-        voxelWorld = new VoxelWorld(assetManager, 320, 32, 320, generator);
+        voxelWorld = new VoxelWorld(assetManager, 128, 32, 128, generator);
         voxelWorld.generateLayers();
         voxelWorld.buildMeshes();
         voxelWorld.clearAllDirtyFlags();

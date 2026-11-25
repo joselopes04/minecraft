@@ -86,11 +86,11 @@ public class PlayerAppState extends BaseAppState {
         playerLight = new PointLight();
         playerLight.setColor(new com.jme3.math.ColorRGBA(0.6f, 0.55f, 0.5f, 1f));
         playerLight.setRadius(12f);
-        rootNode.addLight(playerLight);
+        //rootNode.addLight(playerLight);
 
         respawn();
 
-        cam.setFrustumPerspective(60f, (float) cam.getWidth() / cam.getHeight(), 0.05f, 500f);
+        cam.setFrustumPerspective(60f, (float) cam.getWidth() / cam.getHeight(), 0.05f, 140f);
         applyViewToCamera();
     }
 
@@ -141,14 +141,6 @@ public class PlayerAppState extends BaseAppState {
             blockBody = world.getBlockAt(bx, byBody, bz);
             inWater = (blockFeet == jogo.voxel.VoxelPalette.WATER_ID
                     || blockBody == jogo.voxel.VoxelPalette.WATER_ID);
-        }
-
-        // Log de diagnóstico a cada 0.5 segundos no terminal
-        debugTimer += tpf;
-        if (debugTimer >= 0.5f) {
-            debugTimer = 0f;
-            System.out.println(String.format("Pos(%.1f, %.2f, %.1f) | Feet=%d Body=%d | inWater=%b | onGround=%b",
-                    pos.x, pos.y, pos.z, blockFeet, blockBody, inWater, characterControl.isOnGround()));
         }
 
         // 2. Gravidade mais natural na água (-12f em vez de -4f, para afundar logo ao entrar)

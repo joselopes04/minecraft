@@ -73,15 +73,21 @@ public abstract class VoxelBlockType {
             return null;
         }
 
-        Material m = new Material(assetManager, "Common/MatDefs/Light/Lighting.j3md");
+      /*  Material m = new Material(assetManager, "Common/MatDefs/Light/Lighting.j3md");
         m.setTexture("DiffuseMap", tex);
         m.setBoolean("UseMaterialColors", true);
         m.setColor("Diffuse", ColorRGBA.White);
+        m.setColor("Ambient", ColorRGBA.White);
         m.setFloat("Shininess", 0f);
         m.setColor("Specular", ColorRGBA.White.mult(0.02f));
         return m;
-    }
+    }*/
+        Material m = new Material(assetManager, "Common/MatDefs/Misc/Unshaded.j3md");
+        m.setTexture("ColorMap", tex);
+        m.setBoolean("VertexColor", true);
+        return m;
 
+    }
     protected Texture getDefaultTexture() {
         // Fallback genérico xadrez acinzentado
         return ProcTextures.checker(128, 4, ColorRGBA.Gray, ColorRGBA.DarkGray);
