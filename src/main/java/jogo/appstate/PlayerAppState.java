@@ -22,7 +22,6 @@ public class PlayerAppState extends BaseAppState {
     private final InputAppState input;
     private final PhysicsSpace physicsSpace;
     private final WorldAppState world;
-
     private Node playerNode;
     private BetterCharacterControl characterControl;
     private Player player;
