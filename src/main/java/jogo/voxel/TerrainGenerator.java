@@ -60,7 +60,7 @@ public class TerrainGenerator {
 
         // Terra Layer
         if (y >= alturaSuperficie - 2) {
-            return VoxelPalette.WATER_ID; 
+            return VoxelPalette.DIRT_ID; 
         }
 
         return VoxelPalette.STONE_ID;

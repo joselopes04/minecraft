@@ -77,7 +77,7 @@ public class Jogo extends SimpleApplication {
         stateManager.attach(player);
 
         // Post-processing: SSAO for subtle contact shadows
-        try {
+      /*  try {
             FilterPostProcessor fpp = new FilterPostProcessor(assetManager);
             Class<?> ssaoCls = Class.forName("com.jme3.post.ssao.SSAOFilter");
             Object ssao = ssaoCls.getConstructor(float.class, float.class, float.class, float.class)
@@ -88,7 +88,7 @@ public class Jogo extends SimpleApplication {
             viewPort.addProcessor(fpp);
         } catch (Exception e) {
             System.out.println("SSAO not available (effects module missing?): " + e.getMessage());
-        }
+        }*/
 
         // HUD (just a crosshair for now)
         stateManager.attach(new HudAppState(guiNode, assetManager));

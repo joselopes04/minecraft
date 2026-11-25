@@ -48,17 +48,17 @@ public class WorldAppState extends BaseAppState {
 
         // Lighting
         AmbientLight ambient = new AmbientLight();
-        ambient.setColor(ColorRGBA.White.mult(0.20f)); // slightly increased ambient
+        ambient.setColor(ColorRGBA.White.mult(0.75f));
         worldNode.addLight(ambient);
 
         DirectionalLight sun = new DirectionalLight();
         sun.setDirection(new Vector3f(-0.35f, -1.3f, -0.25f).normalizeLocal()); // more top-down to reduce harsh contrast
-        sun.setColor(ColorRGBA.White.mult(0.85f)); // slightly dimmer sun
+        sun.setColor(ColorRGBA.White.mult(0.25f)); // slightly dimmer sun
         worldNode.addLight(sun);
 
         // Voxel world criado com base no terrain generator
         TerrainGenerator generator = new TerrainGenerator("IscteCraft2026");
-        voxelWorld = new VoxelWorld(assetManager, 320, 32, 320, generator);
+        voxelWorld = new VoxelWorld(assetManager, 128, 32, 128, generator);
         voxelWorld.generateLayers();
         voxelWorld.buildMeshes();
         voxelWorld.clearAllDirtyFlags();
@@ -117,7 +117,7 @@ public class WorldAppState extends BaseAppState {
 
   public byte getBlockAt(int x, int y, int z) {
         if (voxelWorld == null) return jogo.voxel.VoxelPalette.AIR_ID;
-        if (x < 0 || y < 0 || z < 0 || x >= 320 || y >= 32 || z >= 320) {
+        if (x < 0 || y < 0 || z < 0 || x >= 128 || y >= 32 || z >= 128) {
             return jogo.voxel.VoxelPalette.AIR_ID;
         }
         return voxelWorld.getBlock(x, y, z);
