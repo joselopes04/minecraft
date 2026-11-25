@@ -19,9 +19,14 @@ public class InputAppState extends BaseAppState implements ActionListener, Analo
     private volatile boolean jumpRequested;
     private volatile boolean jumpHeld; //Guarda se a tecla de salto está a ser carregada, para permitir o buffer do salto
     private volatile boolean breakRequested;
+    private volatile boolean placeRequested;
+    private volatile boolean uiLeftClickRequested;
+    private volatile boolean uiRightClickRequested;
     private volatile boolean toggleShadingRequested;
     private volatile boolean respawnRequested;
     private volatile boolean interactRequested;
+    private volatile int requestedHotbarSlot = -1;
+    private volatile int hotbarScrollDelta = 0;
     private float mouseDX, mouseDY;
     private boolean mouseCaptured = true;
 
@@ -42,17 +47,31 @@ public class InputAppState extends BaseAppState implements ActionListener, Analo
         im.addMapping("MouseY-", new MouseAxisTrigger(MouseInput.AXIS_Y, true));
         // Toggle capture (use TAB, ESC exits app by default)
         im.addMapping("ToggleMouse", new KeyTrigger(KeyInput.KEY_TAB));
-        // Break voxel (left mouse)
+        // Break voxel (left mouse) / Place block (right mouse)
         im.addMapping("Break", new MouseButtonTrigger(com.jme3.input.MouseInput.BUTTON_LEFT));
+        im.addMapping("Place", new MouseButtonTrigger(com.jme3.input.MouseInput.BUTTON_RIGHT));
         // Toggle shading (L)
         im.addMapping("ToggleShading", new KeyTrigger(KeyInput.KEY_L));
         // Respawn (R)
         im.addMapping("Respawn", new KeyTrigger(KeyInput.KEY_R));
         // Interact (E)
         im.addMapping("Interact", new KeyTrigger(KeyInput.KEY_E));
+        // Hotbar slots (1-9) e scroll do rato
+        im.addMapping("Hotbar1", new KeyTrigger(KeyInput.KEY_1));
+        im.addMapping("Hotbar2", new KeyTrigger(KeyInput.KEY_2));
+        im.addMapping("Hotbar3", new KeyTrigger(KeyInput.KEY_3));
+        im.addMapping("Hotbar4", new KeyTrigger(KeyInput.KEY_4));
+        im.addMapping("Hotbar5", new KeyTrigger(KeyInput.KEY_5));
+        im.addMapping("Hotbar6", new KeyTrigger(KeyInput.KEY_6));
+        im.addMapping("Hotbar7", new KeyTrigger(KeyInput.KEY_7));
+        im.addMapping("Hotbar8", new KeyTrigger(KeyInput.KEY_8));
+        im.addMapping("Hotbar9", new KeyTrigger(KeyInput.KEY_9));
+        im.addMapping("HotbarScrollUp", new MouseAxisTrigger(MouseInput.AXIS_WHEEL, false));
+        im.addMapping("HotbarScrollDown", new MouseAxisTrigger(MouseInput.AXIS_WHEEL, true));
 
-        im.addListener(this, "MoveForward", "MoveBackward", "MoveLeft", "MoveRight", "Jump", "Sprint", "ToggleMouse", "Break", "ToggleShading", "Respawn", "Interact");
-        im.addListener(this, "MouseX+", "MouseX-", "MouseY+", "MouseY-");
+        im.addListener(this, "MoveForward", "MoveBackward", "MoveLeft", "MoveRight", "Jump", "Sprint", "ToggleMouse", "Break", "Place", "ToggleShading", "Respawn", "Interact",
+                "Hotbar1", "Hotbar2", "Hotbar3", "Hotbar4", "Hotbar5", "Hotbar6", "Hotbar7", "Hotbar8", "Hotbar9");
+        im.addListener(this, "MouseX+", "MouseX-", "MouseY+", "MouseY-", "HotbarScrollUp", "HotbarScrollDown");
     }
 
     @Override
@@ -70,9 +89,15 @@ public class InputAppState extends BaseAppState implements ActionListener, Analo
         im.deleteMapping("MouseY-");
         im.deleteMapping("ToggleMouse");
         im.deleteMapping("Break");
+        im.deleteMapping("Place");
         im.deleteMapping("ToggleShading");
         im.deleteMapping("Respawn");
         im.deleteMapping("Interact");
+        for (int i = 1; i <= 9; i++) {
+            im.deleteMapping("Hotbar" + i);
+        }
+        im.deleteMapping("HotbarScrollUp");
+        im.deleteMapping("HotbarScrollDown");
         im.removeListener(this);
     }
 
@@ -100,7 +125,20 @@ public class InputAppState extends BaseAppState implements ActionListener, Analo
                 if (isPressed) setMouseCaptured(!mouseCaptured);
             }
             case "Break" -> {
-                if (isPressed && mouseCaptured) breakRequested = true;
+                // Separa o clique esquerdo conforme o contexto:
+                // com o rato capturado, parte blocos no mundo; com o cursor livre, interage com os slots da UI.
+                if (isPressed) {
+                    if (mouseCaptured) breakRequested = true;
+                    else uiLeftClickRequested = true;
+                }
+            }
+            case "Place" -> {
+                // Separa o clique direito conforme o contexto:
+                // com o rato capturado, coloca blocos no mundo; com o cursor livre, divide/deposita 1 item na UI.
+                if (isPressed) {
+                    if (mouseCaptured) placeRequested = true;
+                    else uiRightClickRequested = true;
+                }
             }
             case "ToggleShading" -> {
                 if (isPressed) toggleShadingRequested = true;
@@ -109,8 +147,20 @@ public class InputAppState extends BaseAppState implements ActionListener, Analo
                 if (isPressed) respawnRequested = true;
             }
             case "Interact" -> {
-                if (isPressed && mouseCaptured) interactRequested = true;
+                // Permite acionar a interação mesmo se o cursor estiver livre (mouseCaptured == false),
+                // possibilitando ao jogador pressionar 'E' para fechar janelas de inventário abertas.
+                if (isPressed) interactRequested = true;
             }
+            // Seleção direta dos 9 slots da hotbar (teclas 1-9) apenas durante o jogo ativo
+            case "Hotbar1" -> { if (isPressed && mouseCaptured) requestedHotbarSlot = 0; }
+            case "Hotbar2" -> { if (isPressed && mouseCaptured) requestedHotbarSlot = 1; }
+            case "Hotbar3" -> { if (isPressed && mouseCaptured) requestedHotbarSlot = 2; }
+            case "Hotbar4" -> { if (isPressed && mouseCaptured) requestedHotbarSlot = 3; }
+            case "Hotbar5" -> { if (isPressed && mouseCaptured) requestedHotbarSlot = 4; }
+            case "Hotbar6" -> { if (isPressed && mouseCaptured) requestedHotbarSlot = 5; }
+            case "Hotbar7" -> { if (isPressed && mouseCaptured) requestedHotbarSlot = 6; }
+            case "Hotbar8" -> { if (isPressed && mouseCaptured) requestedHotbarSlot = 7; }
+            case "Hotbar9" -> { if (isPressed && mouseCaptured) requestedHotbarSlot = 8; }
         }
     }
 
@@ -122,6 +172,9 @@ public class InputAppState extends BaseAppState implements ActionListener, Analo
             case "MouseX-" -> mouseDX -= value;
             case "MouseY+" -> mouseDY += value;
             case "MouseY-" -> mouseDY -= value;
+            // Navegação sequencial na hotbar através da roda do rato
+            case "HotbarScrollUp" -> hotbarScrollDelta -= 1;
+            case "HotbarScrollDown" -> hotbarScrollDelta += 1;
         }
     }
 
@@ -151,6 +204,27 @@ public class InputAppState extends BaseAppState implements ActionListener, Analo
         return r;
     }
 
+    /** Consome o pedido de colocação de bloco (botão direito com rato capturado). */
+    public boolean consumePlaceRequested() {
+        boolean r = placeRequested;
+        placeRequested = false;
+        return r;
+    }
+
+    /** Consome o clique esquerdo na interface (botão esquerdo com inventário aberto). */
+    public boolean consumeUiLeftClickRequested() {
+        boolean r = uiLeftClickRequested;
+        uiLeftClickRequested = false;
+        return r;
+    }
+
+    /** Consome o clique direito na interface (botão direito com inventário aberto). */
+    public boolean consumeUiRightClickRequested() {
+        boolean r = uiRightClickRequested;
+        uiRightClickRequested = false;
+        return r;
+    }
+
     public boolean consumeToggleShadingRequested() {
         boolean r = toggleShadingRequested;
         toggleShadingRequested = false;
@@ -167,6 +241,24 @@ public class InputAppState extends BaseAppState implements ActionListener, Analo
         boolean r = interactRequested;
         interactRequested = false;
         return r;
+    }
+
+    /**
+     * Retorna o índice do slot da hotbar pedido via teclas 1-9 (0 a 8), ou -1 se não houver pedido.
+     */
+    public int consumeRequestedHotbarSlot() {
+        int slot = requestedHotbarSlot;
+        requestedHotbarSlot = -1;
+        return slot;
+    }
+
+    /**
+     * Retorna o deslocamento acumulado da roda do rato para navegação na hotbar.
+     */
+    public int consumeHotbarScrollDelta() {
+        int delta = hotbarScrollDelta;
+        hotbarScrollDelta = 0;
+        return delta;
     }
 
     public Vector2f consumeMouseDelta() {
