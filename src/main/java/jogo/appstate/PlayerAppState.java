@@ -81,7 +81,7 @@ public class PlayerAppState extends BaseAppState {
         characterControl.setJumpForce(new Vector3f(0, 540f, 0));
         playerNode.addControl(characterControl);
         physicsSpace.add(characterControl);
-        characterControl.setGravity(new Vector3f(0, -24f, 0));
+        characterControl.setGravity(new Vector3f(0, -20, 0));
 
         playerLight = new PointLight();
         playerLight.setColor(new com.jme3.math.ColorRGBA(0.6f, 0.55f, 0.5f, 1f));
