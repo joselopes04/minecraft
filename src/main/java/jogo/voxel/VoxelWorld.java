@@ -19,6 +19,7 @@ import jogo.interaction.BlockPos;
 import jogo.inventory.Container;
 import jogo.util.ProcTextures;
 
+
 public class VoxelWorld {
     private final AssetManager assetManager;
     private final int sizeX, sizeY, sizeZ;
