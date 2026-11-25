@@ -12,6 +12,7 @@ import com.jme3.math.Vector3f;
 import com.jme3.renderer.Camera;
 import com.jme3.scene.Node;
 
+import jogo.WorldConfig;
 import jogo.voxel.VoxelWorld;
 import jogo.voxel.terrainGenerator.TerrainGenerator;
 
@@ -57,8 +58,8 @@ public class WorldAppState extends BaseAppState {
         worldNode.addLight(sun);
 
         // Voxel world criado com base no terrain generator
-        TerrainGenerator generator = new TerrainGenerator("IscteCraft2026");
-        voxelWorld = new VoxelWorld(assetManager, 640, 127, 640, generator);
+        TerrainGenerator generator = new TerrainGenerator(WorldConfig.Terrain.SEED);
+        voxelWorld = new VoxelWorld(assetManager, WorldConfig.Terrain.SIZE, WorldConfig.Terrain.HEIGHT, WorldConfig.Terrain.SIZE, generator);
         voxelWorld.generateLayers();
         voxelWorld.buildMeshes();
         voxelWorld.clearAllDirtyFlags();
@@ -117,9 +118,6 @@ public class WorldAppState extends BaseAppState {
 
   public byte getBlockAt(int x, int y, int z) {
         if (voxelWorld == null) return jogo.voxel.VoxelPalette.AIR_ID;
-        if (x < 0 || y < 0 || z < 0 || x >= 320 || y >= 32 || z >= 320) {
-            return jogo.voxel.VoxelPalette.AIR_ID;
-        }
         return voxelWorld.getBlock(x, y, z);
     }
 }

@@ -10,6 +10,8 @@ import com.jme3.renderer.Camera;
 import com.jme3.scene.Geometry;
 import com.jme3.scene.Node;
 import com.jme3.texture.Texture2D;
+
+import jogo.WorldConfig;
 import jogo.util.ProcTextures;
 import jogo.voxel.terrainGenerator.TerrainGenerator;
 
@@ -29,7 +31,6 @@ public class VoxelWorld {
     private boolean lit = true;       // Shading: On by default
     private boolean wireframe = false; // Wireframe: Off by default
     private boolean culling = true;   // Culling: On by default
-    private int groundHeight = 8; // baseline Y level
 
     //Criar o objeto TerrainGenerator com uma seed fixa para gerar o terreno
     private final TerrainGenerator terrainGenerator;
@@ -107,14 +108,14 @@ public class VoxelWorld {
 
    //Gera as camadas do terreno com base na altura da superfície e na posição (x, y, z)
     public void generateLayers() {
-        // Percorre todas as posições do mundo (x,y,z)
+    // Percorre todas as posições do mundo (x,z)
         for (int x = 0; x < sizeX; x++) {
             for (int z = 0; z < sizeZ; z++) {
-                for (int y = 0; y < sizeY; y++) {
-                    byte blockId = terrainGenerator.getBlockIdAt(x, y, z); 
-                    if (blockId != VoxelPalette.AIR_ID) { //Verificar se o bloco não é ar, pois o ar é colocado na geração dos chunks.
-                        setBlock(x, y, z, blockId);
-                    }
+                int surfaceHeight = terrainGenerator.getSurfaceHeight(x, z); // Recebe a altura do bloco sólido mais alto no ponto (x,z)
+                int maxBlockY = Math.min(terrainGenerator.getHighestBlockY(surfaceHeight), sizeY - 1); // Maior y não-ar desta coluna, garantindo que não ultrapassa a altura máxima do mundo
+                for (int y = 0; y <= maxBlockY; y++) { //Percorre as posições de y do mundo
+                    byte blockId = terrainGenerator.getBlockIdAt(y, surfaceHeight); // Recebe o ID do bloco sólido mais alto
+                    if (blockId != VoxelPalette.AIR_ID) setBlock(x, y, z, blockId); // Se o bloco não for ar, define o bloco na posição 
                 }
             }
         }
@@ -132,7 +133,7 @@ public class VoxelWorld {
         int cx = sizeX / 2;
         int cz = sizeZ / 2;
         int ty = getTopSolidY(cx, cz);
-        if (ty < 0) ty = groundHeight;
+        if (ty < 0) ty = WorldConfig.Terrain.SPAWN_LEVEL;
         return new Vector3f(cx + 0.5f, ty + 3.0f, cz + 0.5f);
     }
 
@@ -287,8 +288,6 @@ public class VoxelWorld {
         setWireframe(!isWireframe());
         setCulling(!isCulling());
     }
-
-    public int getGroundHeight() { return groundHeight; }
 
     public VoxelPalette getPalette() {
         return palette;

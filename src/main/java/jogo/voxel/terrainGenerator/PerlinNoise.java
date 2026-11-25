@@ -2,12 +2,6 @@ package jogo.voxel.terrainGenerator;
 
 import java.util.Random;
 
-/**
- * Improved Perlin noise 2D, seguindo a explicação de R. Touti
- * (https://rtouti.github.io/graphics/perlin-noise-algorithm).
- * Determinístico: a mesma seed produz sempre a mesma tabela de permutação.
- * Nota: o ruído repete-se a cada 256 unidades (tamanho da tabela).
- */
 public class PerlinNoise {
 
     /** Tabela de permutação: baralhada primeiro e duplicada depois (evita overflow em X+1). */
@@ -27,20 +21,17 @@ public class PerlinNoise {
         for (int i = 0; i < 512; i++) permutation[i] = p[i & 255];
     }
 
-    /** Curva de suavização 6t^5 - 15t^4 + 10t^3 (versão com menos multiplicações). */
+    //Curva de suavização para interpolação
     private static double fade(double t) {
         return ((6 * t - 15) * t + 10) * t * t * t;
     }
 
-    private static double lerp(double t, double a1, double a2) {
+    // Interpolação linear entre a1 e a2, com t em [0,1]
+    private static double linearInterpolation (double t, double a1, double a2) {
         return a1 + t * (a2 - a1);
     }
 
-    /**
-     * Produto escalar entre o vetor canto→ponto (dx, dy) e o vetor constante do canto.
-     * Os 4 vetores possíveis são (1,1), (-1,1), (-1,-1) e (1,-1), escolhidos por (valor & 3).
-     * Equivale ao GetConstantVector + dot do artigo, mas sem criar objetos.
-     */
+    // Calcula o produto escalar entre o vetor de gradiente e o vetor de deslocamento (dx, dy)
     private static double dotConstantVector(int value, double dx, double dy) {
         switch (value & 3) {
             case 0:  return  dx + dy;
@@ -50,7 +41,7 @@ public class PerlinNoise {
         }
     }
 
-    /** Perlin noise 2D. Resultado aproximadamente em [-1, 1]. */
+    // Calcula o valor do ruído Perlin para a posição (x,y), o valor está entre -1 e 1
     public double noise(double x, double y) {
         double floorX = Math.floor(x);
         double floorY = Math.floor(y);
@@ -61,30 +52,26 @@ public class PerlinNoise {
         double yf = y - floorY;
 
         // Valor da tabela para cada um dos 4 cantos (mesmo canto => mesmo valor)
-        int valueTopRight    = permutation[permutation[X + 1] + Y + 1];
-        int valueTopLeft     = permutation[permutation[X]     + Y + 1];
+        int valueTopRight = permutation[permutation[X + 1] + Y + 1];
+        int valueTopLeft = permutation[permutation[X] + Y + 1];
         int valueBottomRight = permutation[permutation[X + 1] + Y];
-        int valueBottomLeft  = permutation[permutation[X]     + Y];
+        int valueBottomLeft = permutation[permutation[X] + Y];
 
-        double dotTopRight    = dotConstantVector(valueTopRight,    xf - 1.0, yf - 1.0);
-        double dotTopLeft     = dotConstantVector(valueTopLeft,     xf,       yf - 1.0);
+        double dotTopRight = dotConstantVector(valueTopRight,xf - 1.0, yf - 1.0);
+        double dotTopLeft = dotConstantVector(valueTopLeft,xf, yf - 1.0);
         double dotBottomRight = dotConstantVector(valueBottomRight, xf - 1.0, yf);
-        double dotBottomLeft  = dotConstantVector(valueBottomLeft,  xf,       yf);
+        double dotBottomLeft = dotConstantVector(valueBottomLeft, xf, yf);
 
         double u = fade(xf);
         double v = fade(yf);
 
-        return lerp(u,
-                lerp(v, dotBottomLeft,  dotTopLeft),
-                lerp(v, dotBottomRight, dotTopRight));
+        return linearInterpolation (u,
+                linearInterpolation (v, dotBottomLeft,  dotTopLeft),
+                linearInterpolation (v, dotBottomRight, dotTopRight));
     }
 
-    /**
-     * Fractal Brownian Motion: soma de várias oitavas, cada uma com
-     * frequência * lacunarity e amplitude * persistence.
-     * Normalizado pela soma das amplitudes para ficar em ~[-1, 1].
-     */
-    public double fbm(double x, double y, int octaves, double persistence, double lacunarity) {
+   // Combina as várias oitavas de ruído Perlin para criar um padrão mais complexo e natural. O resultado está em [-1, 1].
+    public double fractalBrownianMotion(double x, double y, int octaves, double persistence, double lacunarity) {
         double result = 0.0;
         double amplitude = 1.0;
         double frequency = 1.0;

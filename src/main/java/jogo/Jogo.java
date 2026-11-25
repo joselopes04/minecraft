@@ -77,18 +77,18 @@ public class Jogo extends SimpleApplication {
         stateManager.attach(player);
 
         // Post-processing: SSAO for subtle contact shadows
-        try {
-            FilterPostProcessor fpp = new FilterPostProcessor(assetManager);
-            Class<?> ssaoCls = Class.forName("com.jme3.post.ssao.SSAOFilter");
-            Object ssao = ssaoCls.getConstructor(float.class, float.class, float.class, float.class)
-                    .newInstance(2.1f, 0.6f, 0.5f, 0.02f); // radius, intensity, scale, bias
-            // Add filter via reflection to avoid compile-time dependency
-            java.lang.reflect.Method addFilter = FilterPostProcessor.class.getMethod("addFilter", Class.forName("com.jme3.post.Filter"));
-            addFilter.invoke(fpp, ssao);
-            viewPort.addProcessor(fpp);
-        } catch (Exception e) {
-            System.out.println("SSAO not available (effects module missing?): " + e.getMessage());
-        }
+        // try {
+        //     FilterPostProcessor fpp = new FilterPostProcessor(assetManager);
+        //     Class<?> ssaoCls = Class.forName("com.jme3.post.ssao.SSAOFilter");
+        //     Object ssao = ssaoCls.getConstructor(float.class, float.class, float.class, float.class)
+        //             .newInstance(2.1f, 0.6f, 0.5f, 0.02f); // radius, intensity, scale, bias
+        //     // Add filter via reflection to avoid compile-time dependency
+        //     java.lang.reflect.Method addFilter = FilterPostProcessor.class.getMethod("addFilter", Class.forName("com.jme3.post.Filter"));
+        //     addFilter.invoke(fpp, ssao);
+        //     viewPort.addProcessor(fpp);
+        // } catch (Exception e) {
+          //   System.out.println("SSAO not available (effects module missing?): " + e.getMessage());
+        // }
 
         // HUD (just a crosshair for now)
         stateManager.attach(new HudAppState(guiNode, assetManager));
