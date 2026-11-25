@@ -108,7 +108,25 @@ public class HudAppState extends BaseAppState {
 
         if (player != null) {
             Container current = player.getOpenContainer();
+            Container previous = lastRenderedContainer;
             if (current != lastRenderedContainer) {
+                if (current == null && heldItem != null) {
+                    boolean collectedAll = player.collectItem(heldItem);
+                    if (!collectedAll && previous != null) {
+                        collectedAll = previous.addItem(heldItem);
+                    }
+                    if (!collectedAll) {
+                        // Sem espaço no inventário nem no contentor: mantém o contentor aberto com o item na mão
+                        player.openContainer(previous);
+                        showContainerUI(previous);
+                        forceRebuildHotbar();
+                        rebuildHeldItemUI();
+                        return;
+                    }
+                    heldItem = null;
+                    hideHeldItemUI();
+                }
+
                 lastRenderedContainer = current;
 
                 if (current != null) {
@@ -116,17 +134,13 @@ public class HudAppState extends BaseAppState {
                     showContainerUI(current);
                     if (input != null) {
                         input.setMouseCaptured(false);
+                        input.consumeUiLeftClickRequested();
+                        input.consumeUiRightClickRequested();
                     }
                     if (getApplication() != null) {
                         getApplication().getInputManager().setCursorVisible(true);
                     }
                 } else {
-                    // Se o jogador fechar o inventário enquanto segura um item, devolve-o ao inventário
-                    if (heldItem != null) {
-                        player.collectItem(heldItem);
-                        heldItem = null;
-                        hideHeldItemUI();
-                    }
                     hideContainerUI();
                     if (input != null) {
                         input.setMouseCaptured(true);
@@ -144,6 +158,10 @@ public class HudAppState extends BaseAppState {
                 if (leftClick || rightClick) {
                     handleInventoryClick(current, leftClick);
                 }
+            } else if (input != null) {
+                // Limpa cliques residuais ocorridos enquanto o rato estava livre sem UI aberta
+                input.consumeUiLeftClickRequested();
+                input.consumeUiRightClickRequested();
             }
 
             // Atualiza a posição do ícone do item agarrado pelo cursor
@@ -318,7 +336,7 @@ public class HudAppState extends BaseAppState {
 
             Item item = container.getItem(i);
             if (item != null) {
-                attachItemVisual(containerNode, item, sx, sy, slotSize, 2, true);
+                attachItemVisual(containerNode, item, sx, sy, slotSize, 2);
             }
         }
 
@@ -475,7 +493,7 @@ public class HudAppState extends BaseAppState {
             // Textura e quantidade do item, se o slot estiver ocupado
             Item item = hotbar.getItem(i);
             if (item != null) {
-                attachItemVisual(hotbarNode, item, sx, startY, slotSize, 3, false);
+                attachItemVisual(hotbarNode, item, sx, startY, slotSize, 3);
             }
         }
 
@@ -486,7 +504,7 @@ public class HudAppState extends BaseAppState {
      * Desenha o ícone texturizado do item (ex: Textures/stone.png) e a respetiva quantidade
      * no canto inferior direito do slot.
      */
-    private void attachItemVisual(Node parent, Item item, float sx, float sy, float slotSize, int zBase, boolean centerIcon) {
+    private void attachItemVisual(Node parent, Item item, float sx, float sy, float slotSize, int zBase) {
         Material iconMat = getItemIconMaterial(item.getTexturePath());
         float iconSize = slotSize - 12f;
         float ix = sx + (slotSize - iconSize) / 2f;
@@ -501,7 +519,7 @@ public class HudAppState extends BaseAppState {
             BitmapText itemText = new BitmapText(font);
             itemText.setSize(font.getCharSet().getRenderedSize() * 0.72f);
             itemText.setColor(ColorRGBA.Yellow);
-            String itemName = item.getName();
+            String itemName = item.getName() != null ? item.getName() : "Item";
             if (itemName.length() > 5) itemName = itemName.substring(0, 4) + "..";
             itemText.setText(itemName);
             itemText.setLocalTranslation(sx + 4f, sy + slotSize - 8f, zBase);
@@ -548,7 +566,7 @@ public class HudAppState extends BaseAppState {
         hideHeldItemUI();
         if (heldItem == null) return;
         heldItemNode = new Node("HeldItemUI");
-        attachItemVisual(heldItemNode, heldItem, -20f, -20f, 40f, 10, true);
+        attachItemVisual(heldItemNode, heldItem, -20f, -20f, 40f, 10);
         guiNode.attachChild(heldItemNode);
         updateHeldItemPosition();
     }
